@@ -60,15 +60,6 @@ Agent A (Buyer)                          Agent B (Seller)
 | Fee Abstraction | Agents pay gas in stablecoins, no CELO needed |
 | Sub-cent Gas | High-frequency agent interactions at ~$0.001/tx |
 
-## Hackathon Track
-
-**The Synthesis 2026** — Celo Partner Track ($5,000)
-
-Themes addressed:
-- **Agents that pay** — Scoped escrow, multi-currency settlement
-- **Agents that trust** — On-chain reputation, no centralized registries
-- **Agents that cooperate** — Service marketplace with enforceable deals
-
 ## Development
 
 ```bash
