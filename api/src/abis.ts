@@ -1,0 +1,226 @@
+// Minimal ABIs extracted from compiled contracts
+
+export const SERVICE_REGISTRY_ABI = [
+  {
+    type: "function",
+    name: "getService",
+    inputs: [{ name: "serviceId", type: "uint256" }],
+    outputs: [
+      {
+        type: "tuple",
+        components: [
+          { name: "agentId", type: "uint256" },
+          { name: "provider", type: "address" },
+          { name: "name", type: "string" },
+          { name: "description", type: "string" },
+          { name: "endpoint", type: "string" },
+          { name: "paymentToken", type: "address" },
+          { name: "pricePerCall", type: "uint256" },
+          { name: "active", type: "bool" },
+          { name: "createdAt", type: "uint256" },
+          { name: "updatedAt", type: "uint256" },
+        ],
+      },
+    ],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "nextServiceId",
+    inputs: [],
+    outputs: [{ type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getActiveServices",
+    inputs: [
+      { name: "offset", type: "uint256" },
+      { name: "limit", type: "uint256" },
+    ],
+    outputs: [
+      {
+        name: "result",
+        type: "tuple[]",
+        components: [
+          { name: "agentId", type: "uint256" },
+          { name: "provider", type: "address" },
+          { name: "name", type: "string" },
+          { name: "description", type: "string" },
+          { name: "endpoint", type: "string" },
+          { name: "paymentToken", type: "address" },
+          { name: "pricePerCall", type: "uint256" },
+          { name: "active", type: "bool" },
+          { name: "createdAt", type: "uint256" },
+          { name: "updatedAt", type: "uint256" },
+        ],
+      },
+      { name: "count", type: "uint256" },
+    ],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getAgentServices",
+    inputs: [{ name: "agentId", type: "uint256" }],
+    outputs: [{ type: "uint256[]" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getServicesByTag",
+    inputs: [{ name: "tag", type: "bytes32" }],
+    outputs: [{ type: "uint256[]" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "registerService",
+    inputs: [
+      { name: "agentId", type: "uint256" },
+      { name: "name", type: "string" },
+      { name: "description", type: "string" },
+      { name: "endpoint", type: "string" },
+      { name: "paymentToken", type: "address" },
+      { name: "pricePerCall", type: "uint256" },
+      { name: "tags", type: "bytes32[]" },
+    ],
+    outputs: [{ name: "serviceId", type: "uint256" }],
+    stateMutability: "nonpayable",
+  },
+] as const;
+
+export const NASTAR_ESCROW_ABI = [
+  {
+    type: "function",
+    name: "getDeal",
+    inputs: [{ name: "dealId", type: "uint256" }],
+    outputs: [
+      {
+        type: "tuple",
+        components: [
+          { name: "dealId", type: "uint256" },
+          { name: "serviceId", type: "uint256" },
+          { name: "buyerAgentId", type: "uint256" },
+          { name: "sellerAgentId", type: "uint256" },
+          { name: "buyer", type: "address" },
+          { name: "seller", type: "address" },
+          { name: "paymentToken", type: "address" },
+          { name: "amount", type: "uint256" },
+          { name: "taskDescription", type: "string" },
+          { name: "deliveryProof", type: "string" },
+          { name: "status", type: "uint8" },
+          { name: "createdAt", type: "uint256" },
+          { name: "deadline", type: "uint256" },
+          { name: "completedAt", type: "uint256" },
+        ],
+      },
+    ],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "nextDealId",
+    inputs: [],
+    outputs: [{ type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getBuyerDeals",
+    inputs: [{ name: "agentId", type: "uint256" }],
+    outputs: [{ type: "uint256[]" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getSellerDeals",
+    inputs: [{ name: "agentId", type: "uint256" }],
+    outputs: [{ type: "uint256[]" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "createDeal",
+    inputs: [
+      { name: "serviceId", type: "uint256" },
+      { name: "buyerAgentId", type: "uint256" },
+      { name: "sellerAgentId", type: "uint256" },
+      { name: "paymentToken", type: "address" },
+      { name: "amount", type: "uint256" },
+      { name: "taskDescription", type: "string" },
+      { name: "deadline", type: "uint256" },
+    ],
+    outputs: [{ name: "dealId", type: "uint256" }],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "acceptDeal",
+    inputs: [{ name: "dealId", type: "uint256" }],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "deliverDeal",
+    inputs: [
+      { name: "dealId", type: "uint256" },
+      { name: "proof", type: "string" },
+    ],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "confirmDelivery",
+    inputs: [{ name: "dealId", type: "uint256" }],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "disputeDeal",
+    inputs: [{ name: "dealId", type: "uint256" }],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "claimRefund",
+    inputs: [{ name: "dealId", type: "uint256" }],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+] as const;
+
+export const ERC20_ABI = [
+  {
+    type: "function",
+    name: "transfer",
+    inputs: [
+      { name: "to", type: "address" },
+      { name: "amount", type: "uint256" },
+    ],
+    outputs: [{ type: "bool" }],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "transferFrom",
+    inputs: [
+      { name: "from", type: "address" },
+      { name: "to", type: "address" },
+      { name: "amount", type: "uint256" },
+    ],
+    outputs: [{ type: "bool" }],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "balanceOf",
+    inputs: [{ name: "account", type: "address" }],
+    outputs: [{ type: "uint256" }],
+    stateMutability: "view",
+  },
+] as const;
