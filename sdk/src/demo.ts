@@ -40,8 +40,8 @@ const celoSepolia = defineChain({
 
 // ── Addresses ─────────────────────────────────────────────────────────────────
 const IDENTITY_REGISTRY = "0x8004A818BFB912233c491871b3d84c89A494BD9e" as const;
-const SERVICE_REGISTRY  = "0x035Cec0391bF6399249EEbD1272A82898a22dF73" as const;
-const NASTAR_ESCROW     = "0xE662494f34D6a2e3a299e4509e925A6fF5BeB532" as const;
+const SERVICE_REGISTRY  = "0x1aB9810d5E135f02fC66E875a77Da8fA4e49758e" as const;
+const NASTAR_ESCROW     = "0xEE51f3CA1bcDeb58a94093F759BafBC9157734AF" as const;
 const MOCK_USDC         = "0x93C86be298bcF530E183954766f103B061BF64Ef" as const;
 const TOKEN_DECIMALS    = 6;
 
@@ -86,6 +86,7 @@ const ESCROW_ABI = [
       { name: "sellerAgentId", type: "uint256" }, { name: "paymentToken", type: "address" },
       { name: "amount", type: "uint256" }, { name: "taskDescription", type: "string" },
       { name: "deadline", type: "uint256" },
+      { name: "autoConfirm", type: "bool" },
     ],
     outputs: [{ name: "dealId", type: "uint256" }],
     stateMutability: "nonpayable" },
@@ -251,6 +252,7 @@ async function main() {
       SERVICE_ID, BETA_ID, ALPHA_ID, MOCK_USDC, PRICE,
       "Fetch Celo price, 24h volume, and top 5 validators. Return JSON.",
       DEADLINE,
+      true, // autoConfirm
     ],
   });
   const dealR = await pub.waitForTransactionReceipt({ hash: dealH });
@@ -291,16 +293,10 @@ async function main() {
   txLink(delH, "deliverDeal(proof)");
   ok("Status: Accepted → Delivered");
 
-  // ── Step 7: BETA confirms → payment released ─────────────────────────────
-  step(7, "BETA confirms delivery — escrow releases payment to ALPHA");
-
-  const confH = await buyerWallet.writeContract({
-    address: NASTAR_ESCROW, abi: ESCROW_ABI,
-    functionName: "confirmDelivery", args: [DEAL_ID],
-  });
-  await pub.waitForTransactionReceipt({ hash: confH });
-  txLink(confH, "confirmDelivery()");
-  ok("Status: Delivered → Completed");
+  // ── Step 7: autoConfirm — payment released on delivery ─────────────────
+  step(7, "autoConfirm — payment auto-released on delivery (no manual step)");
+  ok("Status: Accepted → Completed (auto)");
+  ok("Seller paid immediately. Buyer can dispute within 3 days if unhappy.");
 
   // ── Final: read state ─────────────────────────────────────────────────────
   await new Promise(r => setTimeout(r, 3000));

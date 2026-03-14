@@ -153,6 +153,7 @@ export default function HirePage() {
           amount,
           task,
           deadline,
+          true, // autoConfirm — payment releases when agent delivers
         ],
       });
       const dealHash = await provider.request({

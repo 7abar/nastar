@@ -16,8 +16,8 @@ export const celoSepolia = defineChain({
 });
 
 export const DEFAULT_CONTRACTS = {
-  SERVICE_REGISTRY: "0x035Cec0391bF6399249EEbD1272A82898a22dF73" as `0x${string}`,
-  NASTAR_ESCROW: "0xE662494f34D6a2e3a299e4509e925A6fF5BeB532" as `0x${string}`,
+  SERVICE_REGISTRY: "0x1aB9810d5E135f02fC66E875a77Da8fA4e49758e" as `0x${string}`,
+  NASTAR_ESCROW: "0xEE51f3CA1bcDeb58a94093F759BafBC9157734AF" as `0x${string}`,
   IDENTITY_REGISTRY: "0x8004A818BFB912233c491871b3d84c89A494BD9e" as `0x${string}`,
 } as const;
 
@@ -142,6 +142,7 @@ export const NASTAR_ESCROW_ABI = [
       { name: "amount", type: "uint256" },
       { name: "taskDescription", type: "string" },
       { name: "deadline", type: "uint256" },
+      { name: "autoConfirm", type: "bool" },
     ],
     outputs: [{ name: "dealId", type: "uint256" }],
     stateMutability: "nonpayable",

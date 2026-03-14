@@ -54,7 +54,7 @@ contract NastarTest is Test {
         usdc.approve(address(escrow), 10e6);
         uint256 dealId = escrow.createDeal(
             serviceId, aliceAgentId, bobAgentId, address(usdc), 10e6,
-            "Please scrape example.com", block.timestamp + 7 days
+            "Please scrape example.com", block.timestamp + 7 days, false
         );
         vm.stopPrank();
         return dealId;
@@ -173,7 +173,7 @@ contract NastarTest is Test {
         vm.startPrank(alice);
         usdc.approve(address(escrow), 10e6);
         vm.expectRevert(NastarEscrow.SelfDeal.selector);
-        escrow.createDeal(0, aliceAgentId, aliceAgentId, address(usdc), 10e6, "self", block.timestamp + 1 days);
+        escrow.createDeal(0, aliceAgentId, aliceAgentId, address(usdc), 10e6, "self", block.timestamp + 1 days, false);
         vm.stopPrank();
     }
 
@@ -184,14 +184,14 @@ contract NastarTest is Test {
         vm.startPrank(alice);
         usdc.approve(address(escrow), 10e6);
         vm.expectRevert(NastarEscrow.SelfDeal.selector);
-        escrow.createDeal(0, aliceAgentId, aliceAgent2, address(usdc), 10e6, "same wallet", block.timestamp + 1 days);
+        escrow.createDeal(0, aliceAgentId, aliceAgent2, address(usdc), 10e6, "same wallet", block.timestamp + 1 days, false);
         vm.stopPrank();
     }
 
     function test_zeroAmount_reverts() public {
         vm.startPrank(alice);
         vm.expectRevert(NastarEscrow.ZeroAmount.selector);
-        escrow.createDeal(0, aliceAgentId, bobAgentId, address(usdc), 0, "zero", block.timestamp + 1 days);
+        escrow.createDeal(0, aliceAgentId, bobAgentId, address(usdc), 0, "zero", block.timestamp + 1 days, false);
         vm.stopPrank();
     }
 
@@ -199,14 +199,14 @@ contract NastarTest is Test {
         vm.startPrank(alice);
         usdc.approve(address(escrow), 999);
         vm.expectRevert(NastarEscrow.AmountTooSmall.selector);
-        escrow.createDeal(0, aliceAgentId, bobAgentId, address(usdc), 999, "dust", block.timestamp + 1 days);
+        escrow.createDeal(0, aliceAgentId, bobAgentId, address(usdc), 999, "dust", block.timestamp + 1 days, false);
         vm.stopPrank();
     }
 
     function test_zeroPaymentToken_reverts() public {
         vm.startPrank(alice);
         vm.expectRevert(NastarEscrow.ZeroAddress.selector);
-        escrow.createDeal(0, aliceAgentId, bobAgentId, address(0), 10e6, "zero token", block.timestamp + 1 days);
+        escrow.createDeal(0, aliceAgentId, bobAgentId, address(0), 10e6, "zero token", block.timestamp + 1 days, false);
         vm.stopPrank();
     }
 
@@ -215,7 +215,7 @@ contract NastarTest is Test {
         usdc.approve(address(escrow), 10e6);
         // deadline = now + 30 minutes (less than MIN_DEADLINE of 1 hour)
         vm.expectRevert(NastarEscrow.DeadlineTooShort.selector);
-        escrow.createDeal(0, aliceAgentId, bobAgentId, address(usdc), 10e6, "too short", block.timestamp + 30 minutes);
+        escrow.createDeal(0, aliceAgentId, bobAgentId, address(usdc), 10e6, "too short", block.timestamp + 30 minutes, false);
         vm.stopPrank();
     }
 
@@ -225,7 +225,7 @@ contract NastarTest is Test {
         usdc.approve(address(escrow), 10e6);
         // deadline = now + 1 hour (exactly MIN_DEADLINE)
         uint256 dealId = escrow.createDeal(
-            0, aliceAgentId, bobAgentId, address(usdc), 10e6, "min deadline", block.timestamp + 1 hours
+            0, aliceAgentId, bobAgentId, address(usdc), 10e6, "min deadline", block.timestamp + 1 hours, false
         );
         vm.stopPrank();
         assertEq(uint8(escrow.getDeal(dealId).status), uint8(NastarEscrow.DealStatus.Created));
@@ -540,6 +540,54 @@ contract NastarTest is Test {
     // ──────────────────────────────────────────────
     // NastarEscrow — View Helpers
     // ──────────────────────────────────────────────
+
+    // ──────────────────────────────────────────────
+    // NastarEscrow — Auto-Confirm
+    // ──────────────────────────────────────────────
+
+    function test_autoConfirm_releasesOnDelivery() public {
+        uint256 serviceId = _createTestService();
+
+        // Create deal with autoConfirm = true
+        vm.startPrank(alice);
+        usdc.approve(address(escrow), 10e6);
+        uint256 dealId = escrow.createDeal(
+            serviceId, aliceAgentId, bobAgentId, address(usdc), 10e6,
+            "Auto-confirm task", block.timestamp + 7 days, true
+        );
+        vm.stopPrank();
+
+        // Bob accepts
+        vm.prank(bob);
+        escrow.acceptDeal(dealId);
+
+        // Bob delivers — payment should auto-release
+        vm.prank(bob);
+        escrow.deliverDeal(dealId, "ipfs://QmAutoResult");
+
+        // Status should be Completed, NOT Delivered
+        assertEq(uint8(escrow.getDeal(dealId).status), uint8(NastarEscrow.DealStatus.Completed));
+
+        // Funds should be distributed (seller paid, fee to treasury)
+        uint256 fee = _fee(10e6);
+        assertEq(usdc.balanceOf(bob), 10e6 - fee);
+        assertEq(usdc.balanceOf(treasury), fee);
+        assertEq(usdc.balanceOf(address(escrow)), 0);
+    }
+
+    function test_autoConfirm_false_requiresManualConfirm() public {
+        uint256 serviceId = _createTestService();
+        uint256 dealId = _createTestDeal(serviceId); // autoConfirm = false
+
+        _deliverDeal(dealId);
+
+        // Status should be Delivered, NOT Completed
+        assertEq(uint8(escrow.getDeal(dealId).status), uint8(NastarEscrow.DealStatus.Delivered));
+
+        // Funds still in escrow
+        assertEq(usdc.balanceOf(address(escrow)), 10e6);
+        assertEq(usdc.balanceOf(bob), 0);
+    }
 
     function test_getBuyerAndSellerDeals() public {
         uint256 serviceId = _createTestService();

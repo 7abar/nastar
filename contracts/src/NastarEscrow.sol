@@ -82,6 +82,7 @@ contract NastarEscrow {
         uint256 deadline;        // Unix timestamp
         uint256 completedAt;
         uint256 disputedAt;      // Timestamp when buyer opened dispute
+        bool autoConfirm;        // If true, deliverDeal auto-releases payment
     }
 
     // ──────────────────────────────────────────────
@@ -219,7 +220,8 @@ contract NastarEscrow {
         address paymentToken,
         uint256 amount,
         string calldata taskDescription,
-        uint256 deadline
+        uint256 deadline,
+        bool autoConfirm
     ) external nonReentrant returns (uint256 dealId) {
         if (identityRegistry.ownerOf(buyerAgentId) != msg.sender) revert NotAgentOwner();
         if (buyerAgentId == sellerAgentId) revert SelfDeal();
@@ -253,7 +255,8 @@ contract NastarEscrow {
             createdAt: block.timestamp,
             deadline: deadline,
             completedAt: 0,
-            disputedAt: 0
+            disputedAt: 0,
+            autoConfirm: autoConfirm
         });
 
         agentDealsAsBuyer[buyerAgentId].push(dealId);
@@ -279,16 +282,27 @@ contract NastarEscrow {
 
     /**
      * @notice Seller marks deal as delivered with proof of work.
+     *         If autoConfirm is set, payment releases immediately.
+     *         Buyer can still dispute within DISPUTE_TIMEOUT if unhappy.
      */
-    function deliverDeal(uint256 dealId, string calldata proof) external {
+    function deliverDeal(uint256 dealId, string calldata proof) external nonReentrant {
         Deal storage deal = deals[dealId];
         _requireStatus(deal, DealStatus.Accepted);
         if (deal.seller != msg.sender) revert NotSeller();
         if (block.timestamp > deal.deadline) revert DealExpiredError();
 
         deal.deliveryProof = proof;
-        deal.status = DealStatus.Delivered;
-        emit DealDelivered(dealId, proof);
+
+        if (deal.autoConfirm) {
+            // Auto-release payment to seller (buyer opted in)
+            deal.status = DealStatus.Completed;
+            deal.completedAt = block.timestamp;
+            emit DealDelivered(dealId, proof);
+            _paySellerWithFee(deal);
+        } else {
+            deal.status = DealStatus.Delivered;
+            emit DealDelivered(dealId, proof);
+        }
     }
 
     /**
