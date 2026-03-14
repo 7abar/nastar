@@ -3,81 +3,38 @@ export const dynamic = "force-dynamic";
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { createPublicClient, http, formatUnits } from "viem";
-import { celoSepoliaCustom, CONTRACTS, ESCROW_ABI, SERVICE_REGISTRY_ABI } from "@/lib/contracts";
-
-const client = createPublicClient({
-  chain: celoSepoliaCustom,
-  transport: http(),
-});
+import { getStats as fetchStats, getRecentDeals, type Stats } from "@/lib/api";
 
 export default function HomePage() {
-  const [stats, setStats] = useState({
-    totalRevenue: "0",
-    totalJobs: 0,
-    totalAgents: 0,
-    recentJobs: [] as { dealId: number; task: string; amount: string; status: string }[],
-  });
+  const [stats, setStats] = useState<Stats | null>(null);
+  const [recentJobs, setRecentJobs] = useState<{ dealId: number; task: string; amount: string; status: string }[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function load() {
       try {
-        // Get total deals
-        const nextDealId = (await client.readContract({
-          address: CONTRACTS.NASTAR_ESCROW,
-          abi: ESCROW_ABI,
-          functionName: "nextDealId",
-        })) as bigint;
-
-        const totalJobs = Number(nextDealId);
-        let totalRevenue = 0n;
-        const recentJobs: typeof stats.recentJobs = [];
-        const statusMap: Record<number, string> = {
-          0: "Created", 1: "Accepted", 2: "Delivered", 3: "Completed",
-          4: "Disputed", 5: "Refunded", 6: "Expired", 7: "Resolved",
-        };
-
-        for (let i = 0; i < totalJobs && i < 20; i++) {
-          try {
-            const deal = (await client.readContract({
-              address: CONTRACTS.NASTAR_ESCROW,
-              abi: ESCROW_ABI,
-              functionName: "getDeal",
-              args: [BigInt(i)],
-            })) as { amount: bigint; taskDescription: string; status: number };
-            if (deal.status === 3 || deal.status === 7) {
-              totalRevenue += deal.amount;
-            }
-            recentJobs.unshift({
-              dealId: i,
-              task: deal.taskDescription.slice(0, 60),
-              amount: formatUnits(deal.amount, 6),
-              status: statusMap[deal.status] || "Unknown",
-            });
-          } catch {}
-        }
-
-        // Get total agents (services count)
-        const [services] = (await client.readContract({
-          address: CONTRACTS.SERVICE_REGISTRY,
-          abi: SERVICE_REGISTRY_ABI,
-          functionName: "getActiveServices",
-          args: [0n, 100n],
-        })) as [unknown[], bigint];
-
-        setStats({
-          totalRevenue: formatUnits(totalRevenue, 6),
-          totalJobs,
-          totalAgents: services.length,
-          recentJobs: recentJobs.slice(0, 5),
-        });
+        const [s, recent] = await Promise.all([
+          fetchStats(),
+          getRecentDeals(5),
+        ]);
+        setStats(s);
+        setRecentJobs(
+          recent.map((d) => ({
+            dealId: d.dealId,
+            task: d.taskDescription.slice(0, 60),
+            amount: d.amount,
+            status: d.statusLabel,
+          }))
+        );
       } catch (err) {
         console.error(err);
       }
       setLoading(false);
     }
     load();
+    // Auto-refresh every 10s
+    const interval = setInterval(load, 10_000);
+    return () => clearInterval(interval);
   }, []);
 
   return (
@@ -92,7 +49,7 @@ export default function HomePage() {
           <h1 className="text-5xl md:text-7xl font-bold mb-2 tracking-tight">
             <span className="text-green-400">$</span>
             <span className="text-white">
-              {loading ? "..." : parseFloat(stats.totalRevenue).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+              {loading ? "..." : parseFloat(stats?.totalRevenue || "0").toLocaleString("en-US", { minimumFractionDigits: 2 })}
             </span>
           </h1>
           <div className="h-px w-32 mx-auto bg-green-500/30 my-8" />
@@ -132,19 +89,19 @@ export default function HomePage() {
         <div className="max-w-5xl mx-auto px-4 py-12 grid grid-cols-3 gap-8">
           <div className="text-center">
             <p className="text-3xl font-bold text-white">
-              ${loading ? "..." : parseFloat(stats.totalRevenue).toLocaleString()}
+              ${loading ? "..." : parseFloat(stats?.totalRevenue || "0").toLocaleString()}
             </p>
             <p className="text-white/40 text-sm mt-1">Total Revenue</p>
           </div>
           <div className="text-center">
             <p className="text-3xl font-bold text-white">
-              {loading ? "..." : stats.totalJobs}
+              {loading ? "..." : stats?.totalDeals || 0}
             </p>
             <p className="text-white/40 text-sm mt-1">Total Jobs</p>
           </div>
           <div className="text-center">
             <p className="text-3xl font-bold text-white">
-              {loading ? "..." : stats.totalAgents}
+              {loading ? "..." : stats?.totalAgents || 0}
             </p>
             <p className="text-white/40 text-sm mt-1">AI Agents</p>
           </div>
@@ -215,9 +172,9 @@ export default function HomePage() {
       {/* Recent Completed Jobs */}
       <section className="max-w-5xl mx-auto px-4 py-16">
         <h2 className="text-xl font-bold mb-6">Recent Jobs</h2>
-        {stats.recentJobs.length > 0 ? (
+        {recentJobs.length > 0 ? (
           <div className="space-y-2">
-            {stats.recentJobs.map((job) => (
+            {recentJobs.map((job) => (
               <div
                 key={job.dealId}
                 className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/10"

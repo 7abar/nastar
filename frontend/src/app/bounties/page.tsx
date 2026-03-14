@@ -3,74 +3,26 @@ export const dynamic = "force-dynamic";
 
 import { useState, useEffect } from "react";
 import { usePrivy } from "@privy-io/react-auth";
-import { createPublicClient, http, formatUnits } from "viem";
-import { celoSepoliaCustom, CONTRACTS, ESCROW_ABI } from "@/lib/contracts";
-
-const client = createPublicClient({
-  chain: celoSepoliaCustom,
-  transport: http(),
-});
-
-interface Bounty {
-  dealId: number;
-  task: string;
-  amount: string;
-  buyer: string;
-  deadline: number;
-  status: number;
-}
+import { getBounties, type IndexedDeal } from "@/lib/api";
+import { CONTRACTS } from "@/lib/contracts";
 
 export default function BountiesPage() {
   const { authenticated, login } = usePrivy();
-  const [bounties, setBounties] = useState<Bounty[]>([]);
+  const [bounties, setBounties] = useState<IndexedDeal[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function load() {
       try {
-        const nextDealId = (await client.readContract({
-          address: CONTRACTS.NASTAR_ESCROW,
-          abi: ESCROW_ABI,
-          functionName: "nextDealId",
-        })) as bigint;
-
-        const openBounties: Bounty[] = [];
-
-        for (let i = 0; i < Number(nextDealId) && i < 100; i++) {
-          try {
-            const deal = (await client.readContract({
-              address: CONTRACTS.NASTAR_ESCROW,
-              abi: ESCROW_ABI,
-              functionName: "getDeal",
-              args: [BigInt(i)],
-            })) as {
-              taskDescription: string;
-              amount: bigint;
-              buyer: string;
-              deadline: bigint;
-              status: number;
-            };
-            // Status 0 = Created (waiting for seller to accept)
-            if (deal.status === 0) {
-              openBounties.push({
-                dealId: i,
-                task: deal.taskDescription,
-                amount: formatUnits(deal.amount, 6),
-                buyer: deal.buyer,
-                deadline: Number(deal.deadline),
-                status: deal.status,
-              });
-            }
-          } catch {}
-        }
-
-        setBounties(openBounties);
+        setBounties(await getBounties());
       } catch (err) {
         console.error(err);
       }
       setLoading(false);
     }
     load();
+    const interval = setInterval(load, 15_000);
+    return () => clearInterval(interval);
   }, []);
 
   const now = Math.floor(Date.now() / 1000);
@@ -113,7 +65,7 @@ export default function BountiesPage() {
             </div>
             <p className="text-white/30 mb-2">No open bounties right now</p>
             <p className="text-white/20 text-sm">
-              All requests have been claimed by agents. Check back soon!
+              All requests have been claimed. Check back soon!
             </p>
           </div>
         ) : (
@@ -122,7 +74,6 @@ export default function BountiesPage() {
               const timeLeft = bounty.deadline - now;
               const hoursLeft = Math.max(0, Math.floor(timeLeft / 3600));
               const expired = timeLeft <= 0;
-
               return (
                 <div
                   key={bounty.dealId}
@@ -135,44 +86,24 @@ export default function BountiesPage() {
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="text-white/20 text-xs font-mono">
-                          #{bounty.dealId}
+                        <span className="text-white/20 text-xs font-mono">#{bounty.dealId}</span>
+                        <span className={`px-2 py-0.5 rounded text-xs ${expired ? "bg-red-500/20 text-red-400" : "bg-green-500/20 text-green-400"}`}>
+                          {expired ? "Expired" : "Open"}
                         </span>
-                        {!expired && (
-                          <span className="px-2 py-0.5 rounded text-xs bg-green-500/20 text-green-400">
-                            Open
-                          </span>
-                        )}
-                        {expired && (
-                          <span className="px-2 py-0.5 rounded text-xs bg-red-500/20 text-red-400">
-                            Expired
-                          </span>
-                        )}
                       </div>
-                      <p className="text-white font-medium">{bounty.task}</p>
+                      <p className="text-white font-medium">{bounty.taskDescription}</p>
                     </div>
                     <div className="text-right ml-4">
-                      <p className="text-green-400 font-bold text-lg">
-                        {bounty.amount} USDC
-                      </p>
-                      {!expired && (
-                        <p className="text-white/30 text-xs">
-                          {hoursLeft}h left
-                        </p>
-                      )}
+                      <p className="text-green-400 font-bold text-lg">{bounty.amount} USDC</p>
+                      {!expired && <p className="text-white/30 text-xs">{hoursLeft}h left</p>}
                     </div>
                   </div>
                   <div className="flex items-center justify-between text-xs text-white/30">
                     <span className="font-mono">
-                      Posted by {bounty.buyer.slice(0, 6)}...
-                      {bounty.buyer.slice(-4)}
+                      Posted by {bounty.buyer.slice(0, 6)}...{bounty.buyer.slice(-4)}
                     </span>
                     {!expired && (
-                      <a
-                        href={`https://sepolia.celoscan.io/address/${CONTRACTS.NASTAR_ESCROW}`}
-                        target="_blank"
-                        className="text-green-400 hover:underline"
-                      >
+                      <a href={`https://sepolia.celoscan.io/address/${CONTRACTS.NASTAR_ESCROW}`} target="_blank" className="text-green-400 hover:underline">
                         Claim this bounty →
                       </a>
                     )}

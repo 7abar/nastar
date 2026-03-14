@@ -17,6 +17,8 @@ import { PORT, CONTRACTS, X402_CONFIG } from "./config.js";
 import { publicClient, serialize } from "./lib/client.js";
 import servicesRouter from "./routes/services.js";
 import dealsRouter from "./routes/deals.js";
+import realtimeRouter from "./routes/realtime.js";
+import { startIndexer } from "./lib/indexer.js";
 
 const app = express();
 
@@ -38,16 +40,17 @@ app.get("/", (_req, res) => {
       pricePerCall: X402_CONFIG.priceWei.toString(),
     },
     endpoints: {
-      "GET /services": "List active services (paginated)",
-      "GET /services/count": "Total registered service count",
-      "GET /services/:id": "Get service by ID",
-      "GET /services/tag/:tag": "Services by category tag",
-      "GET /services/agent/:agentId": "Services by agent NFT ID",
-      "GET /services/search/query?q=": "Full-text search [x402 required]",
-      "GET /deals/count": "Total deal count",
-      "GET /deals/:id": "Get deal by ID",
-      "GET /deals/agent/:agentId": "All deals + reputation for agent",
-      "GET /deals/analytics/summary": "Marketplace-wide analytics [x402 required]",
+      "GET /v1/stats": "Real-time marketplace stats (revenue, deals, agents)",
+      "GET /v1/leaderboard": "Agent leaderboard by revenue",
+      "GET /v1/services": "All indexed services (with search: ?q=)",
+      "GET /v1/services/:id": "Service by ID",
+      "GET /v1/deals": "All deals (filter: ?status=0&limit=50&offset=0)",
+      "GET /v1/deals/:id": "Deal by ID",
+      "GET /v1/deals/agent/:agentId": "Deals by agent",
+      "GET /v1/bounties": "Open bounties (unaccepted deals)",
+      "GET /v1/recent": "Recent deals (?limit=10)",
+      "GET /services": "Direct chain read: active services",
+      "GET /deals/:id": "Direct chain read: deal by ID",
       "GET /health": "Node + contract connectivity check",
     },
     writeOperations: {
@@ -116,6 +119,7 @@ app.get("/health", async (_req, res) => {
 // ── Routes ────────────────────────────────────────────────────────────────────
 app.use("/services", servicesRouter);
 app.use("/deals", dealsRouter);
+app.use("/v1", realtimeRouter); // Real-time indexed data
 
 // ── 404 ───────────────────────────────────────────────────────────────────────
 app.use((_req, res) => {
@@ -130,6 +134,8 @@ app.listen(PORT, () => {
   console.log(`  NastarEscrow:    ${CONTRACTS.NASTAR_ESCROW}`);
   console.log(`  x402 payments:   ${X402_CONFIG.payTo !== "0x0000000000000000000000000000000000000000" ? "enabled" : "disabled (set SERVER_WALLET)"}`);
   console.log();
+  // Start chain indexer
+  startIndexer();
 });
 
 export default app;

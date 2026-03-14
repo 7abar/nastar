@@ -2,100 +2,24 @@
 export const dynamic = "force-dynamic";
 
 import { useState, useEffect } from "react";
-import { createPublicClient, http, formatUnits } from "viem";
-import { celoSepoliaCustom, CONTRACTS, ESCROW_ABI, SERVICE_REGISTRY_ABI } from "@/lib/contracts";
-
-const client = createPublicClient({
-  chain: celoSepoliaCustom,
-  transport: http(),
-});
-
-interface AgentRank {
-  agentId: string;
-  name: string;
-  address: string;
-  revenue: bigint;
-  jobsCompleted: number;
-  jobsTotal: number;
-}
+import { getLeaderboard, type LeaderboardEntry } from "@/lib/api";
 
 export default function LeaderboardPage() {
-  const [agents, setAgents] = useState<AgentRank[]>([]);
+  const [agents, setAgents] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function load() {
       try {
-        // Get all deals and compute per-agent stats
-        const nextDealId = (await client.readContract({
-          address: CONTRACTS.NASTAR_ESCROW,
-          abi: ESCROW_ABI,
-          functionName: "nextDealId",
-        })) as bigint;
-
-        const agentMap = new Map<string, AgentRank>();
-
-        // Get services for names
-        const [services] = (await client.readContract({
-          address: CONTRACTS.SERVICE_REGISTRY,
-          abi: SERVICE_REGISTRY_ABI,
-          functionName: "getActiveServices",
-          args: [0n, 100n],
-        })) as unknown as [{ agentId: bigint; name: string; provider: string }[], bigint];
-
-        const nameMap = new Map<string, string>();
-        const addrMap = new Map<string, string>();
-        services.forEach((s) => {
-          nameMap.set(s.agentId.toString(), s.name);
-          addrMap.set(s.agentId.toString(), s.provider);
-        });
-
-        for (let i = 0; i < Number(nextDealId) && i < 100; i++) {
-          try {
-            const deal = (await client.readContract({
-              address: CONTRACTS.NASTAR_ESCROW,
-              abi: ESCROW_ABI,
-              functionName: "getDeal",
-              args: [BigInt(i)],
-            })) as {
-              sellerAgentId: bigint;
-              seller: string;
-              amount: bigint;
-              status: number;
-            };
-
-            const key = deal.sellerAgentId.toString();
-            if (!agentMap.has(key)) {
-              agentMap.set(key, {
-                agentId: key,
-                name: nameMap.get(key) || `Agent #${key}`,
-                address: deal.seller,
-                revenue: 0n,
-                jobsCompleted: 0,
-                jobsTotal: 0,
-              });
-            }
-
-            const agent = agentMap.get(key)!;
-            agent.jobsTotal++;
-            if (deal.status === 3 || deal.status === 7) {
-              agent.jobsCompleted++;
-              agent.revenue += deal.amount;
-            }
-          } catch {}
-        }
-
-        // Sort by revenue descending
-        const sorted = [...agentMap.values()].sort((a, b) =>
-          a.revenue > b.revenue ? -1 : 1
-        );
-        setAgents(sorted);
+        setAgents(await getLeaderboard());
       } catch (err) {
         console.error(err);
       }
       setLoading(false);
     }
     load();
+    const interval = setInterval(load, 15_000);
+    return () => clearInterval(interval);
   }, []);
 
   return (
@@ -103,7 +27,7 @@ export default function LeaderboardPage() {
       <div className="max-w-4xl mx-auto px-4 py-12">
         <h1 className="text-3xl font-bold mb-2">Leaderboard</h1>
         <p className="text-white/40 mb-8">
-          Top agents ranked by on-chain revenue
+          Top agents ranked by on-chain revenue. Updates every 10 seconds.
         </p>
 
         {loading ? (
@@ -116,7 +40,6 @@ export default function LeaderboardPage() {
           </div>
         ) : (
           <div className="space-y-2">
-            {/* Header */}
             <div className="grid grid-cols-12 gap-4 px-4 py-2 text-xs text-white/30 uppercase tracking-wider">
               <div className="col-span-1">Rank</div>
               <div className="col-span-4">Agent</div>
@@ -159,7 +82,9 @@ export default function LeaderboardPage() {
                   </div>
                   <div>
                     <p className="text-white font-medium text-sm">{agent.name}</p>
-                    <p className="text-white/20 text-xs">ID #{agent.agentId}</p>
+                    <p className="text-white/20 text-xs">
+                      ID #{agent.agentId} | {agent.completionRate}% completion
+                    </p>
                   </div>
                 </div>
                 <div className="col-span-3">
@@ -173,7 +98,7 @@ export default function LeaderboardPage() {
                 </div>
                 <div className="col-span-2 text-right">
                   <span className="text-green-400 font-semibold">
-                    ${formatUnits(agent.revenue, 6)}
+                    ${agent.revenue}
                   </span>
                 </div>
                 <div className="col-span-2 text-right">
