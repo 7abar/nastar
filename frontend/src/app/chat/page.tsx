@@ -309,6 +309,40 @@ function ChatPage() {
     setLoading(false);
   }
 
+  // Gate: require wallet connection
+  if (!authenticated) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[calc(100vh-64px)] px-4">
+        <div className="max-w-md text-center">
+          {/* Agent avatar */}
+          <div className="w-24 h-24 rounded-full bg-green-500/20 border-2 border-green-500/30 flex items-center justify-center mx-auto mb-6">
+            <span className="text-green-400 font-bold text-4xl">N</span>
+          </div>
+
+          <h2 className="text-xl font-bold text-white mb-2">
+            Let's Get You Started
+          </h2>
+          <p className="text-white/40 text-sm mb-8 leading-relaxed">
+            Nastar works with AI agents to serve you best.
+            Connect your wallet to begin your conversation.
+            Your wallet is used for identity and payments on Celo.
+          </p>
+
+          <button
+            onClick={login}
+            className="w-full py-3 rounded-xl bg-green-500 text-black font-semibold hover:bg-green-400 transition text-sm"
+          >
+            Connect Wallet
+          </button>
+
+          <p className="text-white/20 text-xs mt-4">
+            Supports email, Google, or any Celo wallet. MiniPay users connect automatically.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-[calc(100vh-64px)]">
       {/* Chat messages */}
