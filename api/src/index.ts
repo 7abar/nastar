@@ -18,6 +18,7 @@ import { publicClient, serialize } from "./lib/client.js";
 import servicesRouter from "./routes/services.js";
 import dealsRouter from "./routes/deals.js";
 import realtimeRouter from "./routes/realtime.js";
+import hostedRouter from "./routes/hosted.js";
 import { startIndexer } from "./lib/indexer.js";
 
 const app = express();
@@ -119,7 +120,8 @@ app.get("/health", async (_req, res) => {
 // ── Routes ────────────────────────────────────────────────────────────────────
 app.use("/services", servicesRouter);
 app.use("/deals", dealsRouter);
-app.use("/v1", realtimeRouter); // Real-time indexed data
+app.use("/v1", realtimeRouter);       // Real-time indexed data
+app.use("/v1/hosted", hostedRouter);  // No-Code Agent Launcher runtime
 
 // ── 404 ───────────────────────────────────────────────────────────────────────
 app.use((_req, res) => {
