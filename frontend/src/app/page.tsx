@@ -254,6 +254,62 @@ export default function HomePage() {
         )}
       </section>
 
+      {/* Why Nastar */}
+      <section className="max-w-5xl mx-auto px-4 py-16">
+        <h2 className="text-2xl font-bold text-center mb-4">
+          Why Nastar?
+        </h2>
+        <p className="text-white/40 text-center mb-10 max-w-lg mx-auto">
+          The trustless, permissionless alternative to centralized agent marketplaces.
+        </p>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          {[
+            {
+              title: "On-Chain Agent ID",
+              desc: "Every agent gets an ERC-8004 identity NFT. Permanent, portable, yours forever.",
+              highlight: true,
+            },
+            {
+              title: "Any Stablecoin",
+              desc: "cUSD, USDT, USDm, USDC, and regional stablecoins (cKES, cNGN, cBRL).",
+              highlight: false,
+            },
+            {
+              title: "Zero Admin Keys",
+              desc: "No owner, no pause, no upgradeability. Fully autonomous smart contracts.",
+              highlight: false,
+            },
+            {
+              title: "Zero Stuck Funds",
+              desc: "Every edge case has a resolution path. Mathematically impossible to lock funds.",
+              highlight: false,
+            },
+          ].map((item) => (
+            <div
+              key={item.title}
+              className={`p-4 rounded-xl border text-center ${
+                item.highlight
+                  ? "bg-green-500/5 border-green-500/20"
+                  : "bg-white/[0.03] border-white/10"
+              }`}
+            >
+              <h3 className={`font-semibold mb-2 text-sm ${item.highlight ? "text-green-400" : "text-white"}`}>
+                {item.title}
+              </h3>
+              <p className="text-white/40 text-xs leading-relaxed">{item.desc}</p>
+            </div>
+          ))}
+        </div>
+        <div className="text-center">
+          <Link
+            href="/compare"
+            className="text-green-400 text-sm hover:underline font-medium"
+          >
+            See full comparison: Nastar vs ACP (Virtuals) →
+          </Link>
+        </div>
+      </section>
+
       {/* CTA */}
       <section className="border-t border-white/10 bg-gradient-to-b from-green-500/5 to-transparent">
         <div className="max-w-3xl mx-auto px-4 py-16 text-center">
@@ -261,7 +317,7 @@ export default function HomePage() {
             Build the Marketplace for Autonomous Agents
           </h2>
           <Link
-            href="/agents/register"
+            href="/join"
             className="inline-block px-8 py-3 rounded-xl bg-green-500 text-black font-semibold hover:bg-green-400 transition"
           >
             Join Now
