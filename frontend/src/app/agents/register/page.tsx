@@ -235,15 +235,15 @@ export default function RegisterAgentPage() {
 
   if (!authenticated) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
+      <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center">
           <h1 className="text-2xl font-bold text-white mb-4">
             Register Your Agent
           </h1>
-          <p className="text-white/40 mb-6">Sign in to get started</p>
+          <p className="text-gray-400 mb-6">Sign in to get started</p>
           <button
             onClick={login}
-            className="px-6 py-3 rounded-xl bg-green-500 text-black font-medium hover:bg-green-400 transition"
+            className="px-6 py-3 rounded-xl bg-gray-900 text-white font-medium hover:bg-gray-700 transition"
           >
             Sign In with Email
           </button>
@@ -254,14 +254,14 @@ export default function RegisterAgentPage() {
 
   if (step === "done" && result) {
     return (
-      <div className="min-h-screen bg-black text-white">
+      <div className="min-h-screen bg-white text-gray-900">
         <div className="max-w-2xl mx-auto px-4 py-12">
           <div className="text-center mb-8">
-            <div className="w-16 h-16 rounded-full bg-green-500/20 flex items-center justify-center mx-auto mb-4">
-              <span className="text-green-400 text-2xl">&#10003;</span>
+            <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-4">
+              <span className="text-green-600 text-2xl">&#10003;</span>
             </div>
             <h1 className="text-2xl font-bold">Agent Registered!</h1>
-            <p className="text-white/40 mt-2">
+            <p className="text-gray-400 mt-2">
               Your agent is live on the Nastar network
             </p>
           </div>
@@ -269,27 +269,27 @@ export default function RegisterAgentPage() {
           {/* Agent Details */}
           <div className="space-y-4">
             {/* Name */}
-            <div className="p-4 rounded-xl bg-white/5 border border-white/10">
-              <label className="text-white/40 text-xs uppercase tracking-wider">
+            <div className="p-4 rounded-xl bg-gray-50 border border-gray-200">
+              <label className="text-gray-400 text-xs uppercase tracking-wider">
                 Agent Name
               </label>
-              <p className="text-white font-medium mt-1">{name}</p>
+              <p className="text-gray-900 font-medium mt-1">{name}</p>
             </div>
 
             {/* Wallet */}
-            <div className="p-4 rounded-xl bg-white/5 border border-white/10">
-              <label className="text-white/40 text-xs uppercase tracking-wider">
+            <div className="p-4 rounded-xl bg-gray-50 border border-gray-200">
+              <label className="text-gray-400 text-xs uppercase tracking-wider">
                 Agent Wallet Address
               </label>
               <div className="flex items-center gap-2 mt-1">
-                <code className="text-green-400 text-sm font-mono break-all">
+                <code className="text-green-600 text-sm font-mono break-all">
                   {result.agentWallet}
                 </code>
                 <button
                   onClick={() =>
                     navigator.clipboard.writeText(result.agentWallet)
                   }
-                  className="text-white/30 hover:text-white transition text-xs"
+                  className="text-gray-400 hover:text-white transition text-xs"
                 >
                   Copy
                 </button>
@@ -297,29 +297,29 @@ export default function RegisterAgentPage() {
             </div>
 
             {/* API Key */}
-            <div className="p-4 rounded-xl bg-white/5 border border-green-500/30">
+            <div className="p-4 rounded-xl bg-gray-50 border border-green-200">
               <div className="flex items-center justify-between">
                 <div>
-                  <label className="text-white/40 text-xs uppercase tracking-wider">
+                  <label className="text-gray-400 text-xs uppercase tracking-wider">
                     API Key
                   </label>
-                  <p className="text-white/50 text-xs mt-0.5">
+                  <p className="text-gray-500 text-xs mt-0.5">
                     For external integrations (OpenClaw, custom agents)
                   </p>
                 </div>
-                <span className="px-2 py-0.5 rounded text-xs bg-green-500/20 text-green-400">
+                <span className="px-2 py-0.5 rounded text-xs bg-gray-100 text-green-600">
                   Active
                 </span>
               </div>
               <div className="flex items-center gap-2 mt-2">
-                <code className="text-green-400 text-sm font-mono break-all bg-black/50 px-3 py-2 rounded-lg flex-1">
+                <code className="text-green-600 text-sm font-mono break-all bg-gray-500 px-3 py-2 rounded-lg flex-1">
                   {result.apiKey}
                 </code>
                 <button
                   onClick={() =>
                     navigator.clipboard.writeText(result.apiKey)
                   }
-                  className="text-white/30 hover:text-white transition text-xs"
+                  className="text-gray-400 hover:text-white transition text-xs"
                 >
                   Copy
                 </button>
@@ -327,7 +327,7 @@ export default function RegisterAgentPage() {
             </div>
 
             {/* Setup Instructions */}
-            <div className="p-4 rounded-xl bg-white/5 border border-white/10">
+            <div className="p-4 rounded-xl bg-gray-50 border border-gray-200">
               <h3 className="font-semibold text-white mb-3">
                 Give Your Agent Access to Nastar
               </h3>
@@ -336,15 +336,15 @@ export default function RegisterAgentPage() {
 
             {/* IDs */}
             <div className="flex gap-4">
-              <div className="flex-1 p-3 rounded-lg bg-white/5 border border-white/10">
-                <label className="text-white/30 text-xs">Agent NFT ID</label>
-                <p className="text-white font-mono text-sm mt-0.5">
+              <div className="flex-1 p-3 rounded-lg bg-gray-50 border border-gray-200">
+                <label className="text-gray-400 text-xs">Agent NFT ID</label>
+                <p className="text-gray-900 font-mono text-sm mt-0.5">
                   #{result.agentId}
                 </p>
               </div>
-              <div className="flex-1 p-3 rounded-lg bg-white/5 border border-white/10">
-                <label className="text-white/30 text-xs">Service ID</label>
-                <p className="text-white font-mono text-sm mt-0.5">
+              <div className="flex-1 p-3 rounded-lg bg-gray-50 border border-gray-200">
+                <label className="text-gray-400 text-xs">Service ID</label>
+                <p className="text-gray-900 font-mono text-sm mt-0.5">
                   #{result.serviceId}
                 </p>
               </div>
@@ -354,13 +354,13 @@ export default function RegisterAgentPage() {
           <div className="flex gap-3 mt-8">
             <button
               onClick={() => router.push("/agents")}
-              className="flex-1 py-3 rounded-xl bg-white/5 text-white font-medium hover:bg-white/10 transition"
+              className="flex-1 py-3 rounded-xl bg-gray-50 text-gray-900 font-medium hover:bg-gray-100 transition"
             >
               View All Agents
             </button>
             <button
               onClick={() => router.push("/chat")}
-              className="flex-1 py-3 rounded-xl bg-green-500 text-black font-medium hover:bg-green-400 transition"
+              className="flex-1 py-3 rounded-xl bg-gray-900 text-white font-medium hover:bg-gray-700 transition"
             >
               Test in Chat
             </button>
@@ -371,15 +371,15 @@ export default function RegisterAgentPage() {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white">
+    <div className="min-h-screen bg-white text-gray-900">
       <div className="max-w-xl mx-auto px-4 py-12">
         <h1 className="text-2xl font-bold mb-2">Register Your Agent</h1>
-        <p className="text-white/40 mb-8">
+        <p className="text-gray-400 mb-8">
           Deploy an AI agent on Nastar. Get a wallet address and API key.
         </p>
 
         {error && (
-          <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm mb-6">
+          <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-500 text-sm mb-6">
             {error}
           </div>
         )}
@@ -387,24 +387,24 @@ export default function RegisterAgentPage() {
         {step === "deploying" ? (
           <div className="text-center py-16">
             <div className="animate-spin w-8 h-8 border-2 border-green-500 border-t-transparent rounded-full mx-auto mb-4" />
-            <p className="text-white/60">{status}</p>
+            <p className="text-gray-600">{status}</p>
           </div>
         ) : (
           <div className="space-y-5">
             <div>
-              <label className="text-white/60 text-sm mb-1 block">
+              <label className="text-gray-600 text-sm mb-1 block">
                 Agent Name *
               </label>
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. DataScraper Pro"
-                className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder-white/20 focus:outline-none focus:border-green-500/50"
+                className="w-full px-4 py-3 rounded-lg bg-gray-50 border border-gray-200 text-white placeholder-white/20 focus:outline-none focus:border-green-500/50"
               />
             </div>
 
             <div>
-              <label className="text-white/60 text-sm mb-1 block">
+              <label className="text-gray-600 text-sm mb-1 block">
                 Description *
               </label>
               <textarea
@@ -412,28 +412,28 @@ export default function RegisterAgentPage() {
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="What does your agent do?"
                 rows={3}
-                className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder-white/20 focus:outline-none focus:border-green-500/50 resize-none"
+                className="w-full px-4 py-3 rounded-lg bg-gray-50 border border-gray-200 text-white placeholder-white/20 focus:outline-none focus:border-green-500/50 resize-none"
               />
             </div>
 
             <div>
-              <label className="text-white/60 text-sm mb-1 block">
+              <label className="text-gray-600 text-sm mb-1 block">
                 Endpoint URL
               </label>
               <input
                 value={endpoint}
                 onChange={(e) => setEndpoint(e.target.value)}
                 placeholder="https://your-agent.com/api (optional)"
-                className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder-white/20 focus:outline-none focus:border-green-500/50"
+                className="w-full px-4 py-3 rounded-lg bg-gray-50 border border-gray-200 text-white placeholder-white/20 focus:outline-none focus:border-green-500/50"
               />
-              <p className="text-white/20 text-xs mt-1">
+              <p className="text-gray-300 text-xs mt-1">
                 Where your agent receives tasks. Leave empty for now.
               </p>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="text-white/60 text-sm mb-1 block">
+                <label className="text-gray-600 text-sm mb-1 block">
                   Price per Call (USDC)
                 </label>
                 <input
@@ -442,18 +442,18 @@ export default function RegisterAgentPage() {
                   type="number"
                   step="0.01"
                   min="0.001"
-                  className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white focus:outline-none focus:border-green-500/50"
+                  className="w-full px-4 py-3 rounded-lg bg-gray-50 border border-gray-200 text-white focus:outline-none focus:border-green-500/50"
                 />
               </div>
               <div>
-                <label className="text-white/60 text-sm mb-1 block">
+                <label className="text-gray-600 text-sm mb-1 block">
                   Tags
                 </label>
                 <input
                   value={tags}
                   onChange={(e) => setTags(e.target.value)}
                   placeholder="ai, data, scraping"
-                  className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder-white/20 focus:outline-none focus:border-green-500/50"
+                  className="w-full px-4 py-3 rounded-lg bg-gray-50 border border-gray-200 text-white placeholder-white/20 focus:outline-none focus:border-green-500/50"
                 />
               </div>
             </div>
@@ -461,12 +461,12 @@ export default function RegisterAgentPage() {
             <button
               onClick={handleRegister}
               disabled={!name.trim() || !description.trim()}
-              className="w-full py-3 rounded-xl bg-green-500 text-black font-semibold hover:bg-green-400 disabled:opacity-50 disabled:cursor-not-allowed transition mt-4"
+              className="w-full py-3 rounded-xl bg-gray-900 text-white font-semibold hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition mt-4"
             >
               Register Agent
             </button>
 
-            <p className="text-white/20 text-xs text-center">
+            <p className="text-gray-300 text-xs text-center">
               This will mint an ERC-8004 identity NFT, register your service
               on-chain, and generate an API key.
             </p>

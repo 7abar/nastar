@@ -61,13 +61,13 @@ export default function OfferingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white">
+    <div className="min-h-screen bg-white text-gray-900">
       <div className="max-w-6xl mx-auto px-4 py-10 md:py-14">
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold mb-2">Agent Services</h1>
-            <p className="text-white/40 text-sm">
+            <p className="text-gray-400 text-sm">
               {services.length} service{services.length !== 1 ? "s" : ""} available. Hire any agent with on-chain escrow.
             </p>
           </div>
@@ -75,22 +75,22 @@ export default function OfferingsPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search services..."
-            className="w-full md:w-64 px-4 py-2.5 rounded-lg bg-white/5 border border-white/10 text-white placeholder-white/20 focus:outline-none focus:border-green-500/50 text-sm"
+            className="w-full md:w-64 px-4 py-2.5 rounded-lg bg-gray-50 border border-gray-200 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-gray-400 text-sm"
           />
         </div>
 
         {loading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {[1, 2, 3, 4, 5, 6].map((i) => (
-              <div key={i} className="h-48 rounded-xl bg-white/5 animate-pulse" />
+              <div key={i} className="h-48 rounded-xl bg-gray-50 animate-pulse" />
             ))}
           </div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-20">
-            <p className="text-white/30 mb-2">
+            <p className="text-gray-400 mb-2">
               {search ? "No services match your search" : "No services registered yet"}
             </p>
-            <Link href="/agents/register" className="text-green-400 text-sm hover:underline">
+            <Link href="/agents/register" className="text-green-600 text-sm hover:underline">
               Register the first agent
             </Link>
           </div>
@@ -99,42 +99,42 @@ export default function OfferingsPage() {
             {filtered.map((svc) => (
               <div
                 key={svc.serviceId}
-                className="p-5 rounded-xl bg-white/[0.03] border border-white/10 hover:border-green-500/20 transition group flex flex-col"
+                className="p-5 rounded-xl bg-white border border-gray-200 hover:border-green-200 transition group flex flex-col"
               >
                 {/* Top: icon + name + id */}
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex items-center gap-3">
                     <div
-                      className="w-10 h-10 rounded-lg bg-green-500/10 flex items-center justify-center text-xl"
+                      className="w-10 h-10 rounded-lg bg-green-50 flex items-center justify-center text-xl"
                       dangerouslySetInnerHTML={{ __html: getIcon(svc.name) }}
                     />
                     <div>
-                      <h3 className="font-semibold text-white text-sm group-hover:text-green-400 transition">
+                      <h3 className="font-semibold text-gray-900 text-sm group-hover:text-green-600 transition">
                         {svc.name}
                       </h3>
-                      <p className="text-white/20 text-xs font-mono">
+                      <p className="text-gray-300 text-xs font-mono">
                         Service #{svc.serviceId} · Agent #{svc.agentId}
                       </p>
                     </div>
                   </div>
-                  <span className="text-green-400 font-semibold text-sm whitespace-nowrap">
+                  <span className="text-green-600 font-semibold text-sm whitespace-nowrap">
                     {svc.pricePerCall} USDC
                   </span>
                 </div>
 
                 {/* Description */}
-                <p className="text-white/40 text-sm leading-relaxed flex-1 mb-4 line-clamp-3">
+                <p className="text-gray-400 text-sm leading-relaxed flex-1 mb-4 line-clamp-3">
                   {svc.description}
                 </p>
 
                 {/* Bottom: provider + hire */}
-                <div className="flex items-center justify-between pt-3 border-t border-white/5">
-                  <span className="text-white/20 text-xs font-mono">
+                <div className="flex items-center justify-between pt-3 border-t border-gray-100">
+                  <span className="text-gray-300 text-xs font-mono">
                     {svc.provider.slice(0, 6)}...{svc.provider.slice(-4)}
                   </span>
                   <Link
                     href={`/chat?agent=${svc.agentId}&name=${encodeURIComponent(svc.name)}`}
-                    className="px-3 py-1.5 rounded-lg bg-green-500/10 text-green-400 text-xs font-medium hover:bg-green-500/20 transition"
+                    className="px-3 py-1.5 rounded-lg bg-green-50 text-green-600 text-xs font-medium hover:bg-gray-100 transition"
                   >
                     Hire →
                   </Link>

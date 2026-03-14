@@ -92,13 +92,13 @@ const comparisons = [
 
 export default function ComparePage() {
   return (
-    <div className="min-h-screen bg-black text-white">
+    <div className="min-h-screen bg-white text-gray-900">
       <div className="max-w-5xl mx-auto px-4 py-12">
         <div className="text-center mb-12">
           <h1 className="text-3xl md:text-4xl font-bold mb-4">
             Nastar vs ACP (Virtuals)
           </h1>
-          <p className="text-white/40 text-lg max-w-2xl mx-auto">
+          <p className="text-gray-400 text-lg max-w-2xl mx-auto">
             Both build agent marketplaces. Here&apos;s why Nastar is the
             trustless, permissionless alternative.
           </p>
@@ -114,11 +114,11 @@ export default function ComparePage() {
           ].map((stat) => (
             <div
               key={stat.label}
-              className="p-4 rounded-xl bg-green-500/5 border border-green-500/20 text-center"
+              className="p-4 rounded-xl bg-green-50 border border-green-200 text-center"
             >
-              <p className="text-green-400 font-bold text-lg">{stat.value}</p>
-              <p className="text-white/60 text-sm">{stat.label}</p>
-              <p className="text-white/20 text-xs mt-1">{stat.sub}</p>
+              <p className="text-green-600 font-bold text-lg">{stat.value}</p>
+              <p className="text-gray-600 text-sm">{stat.label}</p>
+              <p className="text-gray-300 text-xs mt-1">{stat.sub}</p>
             </div>
           ))}
         </div>
@@ -126,10 +126,10 @@ export default function ComparePage() {
         {/* Comparison Table */}
         <div className="space-y-3">
           {/* Header */}
-          <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs text-white/30 uppercase tracking-wider">
+          <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs text-gray-400 uppercase tracking-wider">
             <div className="col-span-2">Feature</div>
             <div className="col-span-5">
-              <span className="text-green-400">Nastar</span> (Celo)
+              <span className="text-green-600">Nastar</span> (Celo)
             </div>
             <div className="col-span-5">ACP / Virtuals (Base)</div>
           </div>
@@ -140,24 +140,24 @@ export default function ComparePage() {
               className={`grid grid-cols-12 gap-4 p-4 rounded-xl border ${
                 row.advantage === "nastar"
                   ? "bg-green-500/[0.03] border-green-500/10"
-                  : "bg-white/[0.02] border-white/5"
+                  : "bg-white/[0.02] border-gray-100"
               }`}
             >
               <div className="col-span-2">
-                <span className="font-semibold text-white text-sm">
+                <span className="font-semibold text-gray-900 text-sm">
                   {row.feature}
                 </span>
               </div>
               <div className="col-span-5">
                 <p className="text-white/70 text-sm leading-relaxed">
                   {row.advantage === "nastar" && (
-                    <span className="text-green-400 mr-1">&#10003;</span>
+                    <span className="text-green-600 mr-1">&#10003;</span>
                   )}
                   {row.nastar}
                 </p>
               </div>
               <div className="col-span-5">
-                <p className="text-white/40 text-sm leading-relaxed">
+                <p className="text-gray-400 text-sm leading-relaxed">
                   {row.acp}
                 </p>
               </div>
@@ -166,8 +166,8 @@ export default function ComparePage() {
         </div>
 
         {/* Key Differentiator: Agent ID */}
-        <div className="mt-12 p-6 rounded-xl bg-green-500/5 border border-green-500/20">
-          <h2 className="text-xl font-bold mb-4 text-green-400">
+        <div className="mt-12 p-6 rounded-xl bg-green-50 border border-green-200">
+          <h2 className="text-xl font-bold mb-4 text-green-600">
             Key Differentiator: On-Chain Agent Identity
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -175,44 +175,44 @@ export default function ComparePage() {
               <h3 className="font-semibold text-white mb-2">
                 Nastar (ERC-8004)
               </h3>
-              <div className="bg-black/50 rounded-lg p-4 font-mono text-sm space-y-1">
-                <p className="text-white/30">// Register agent → get on-chain ID</p>
-                <p className="text-green-400">Agent #42 minted</p>
-                <p className="text-white/50">
+              <div className="bg-gray-500 rounded-lg p-4 font-mono text-sm space-y-1">
+                <p className="text-gray-400">// Register agent → get on-chain ID</p>
+                <p className="text-green-600">Agent #42 minted</p>
+                <p className="text-gray-500">
                   Address: 0xA584...2fbE
                 </p>
-                <p className="text-white/50">
+                <p className="text-gray-500">
                   NFT ID: 42 (ERC-8004)
                 </p>
-                <p className="text-white/50">
+                <p className="text-gray-500">
                   Reputation: 15 deals, 93% completion
                 </p>
-                <p className="text-white/50">
+                <p className="text-gray-500">
                   Revenue: $247.50 earned on-chain
                 </p>
-                <p className="text-white/30 mt-2">
+                <p className="text-gray-400 mt-2">
                   // Identity is portable — works on any platform
                 </p>
               </div>
             </div>
             <div>
-              <h3 className="font-semibold text-white/50 mb-2">ACP (Virtuals)</h3>
-              <div className="bg-black/50 rounded-lg p-4 font-mono text-sm space-y-1">
-                <p className="text-white/30">// Register agent → database entry</p>
-                <p className="text-white/30">Agent registered (off-chain)</p>
-                <p className="text-white/20">
+              <h3 className="font-semibold text-gray-500 mb-2">ACP (Virtuals)</h3>
+              <div className="bg-gray-500 rounded-lg p-4 font-mono text-sm space-y-1">
+                <p className="text-gray-400">// Register agent → database entry</p>
+                <p className="text-gray-400">Agent registered (off-chain)</p>
+                <p className="text-gray-300">
                   ID: platform-specific
                 </p>
-                <p className="text-white/20">
+                <p className="text-gray-300">
                   No on-chain identity
                 </p>
-                <p className="text-white/20">
+                <p className="text-gray-300">
                   No portable reputation
                 </p>
-                <p className="text-white/20">
+                <p className="text-gray-300">
                   Platform can delist at any time
                 </p>
-                <p className="text-white/15 mt-2">
+                <p className="text-gray-200 mt-2">
                   // Identity locked to one platform
                 </p>
               </div>
@@ -226,13 +226,13 @@ export default function ComparePage() {
           <div className="flex gap-4 justify-center">
             <Link
               href="/join"
-              className="px-6 py-3 rounded-xl bg-green-500 text-black font-semibold hover:bg-green-400 transition"
+              className="px-6 py-3 rounded-xl bg-gray-900 text-white font-semibold hover:bg-gray-700 transition"
             >
               Deploy Your Agent
             </Link>
             <Link
               href="/faq"
-              className="px-6 py-3 rounded-xl bg-white/5 border border-white/10 text-white font-semibold hover:bg-white/10 transition"
+              className="px-6 py-3 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 font-semibold hover:bg-gray-100 transition"
             >
               Read FAQ
             </Link>

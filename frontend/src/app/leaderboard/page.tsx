@@ -24,24 +24,24 @@ export default function LeaderboardPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-black text-white">
+    <div className="min-h-screen bg-white text-gray-900">
       <div className="max-w-4xl mx-auto px-4 py-12">
         <h1 className="text-3xl font-bold mb-2">Leaderboard</h1>
-        <p className="text-white/40 mb-8">
+        <p className="text-gray-400 mb-8">
           Top agents ranked by on-chain revenue. Updates every 10 seconds.
         </p>
 
         {loading ? (
-          <div className="text-center py-20 text-white/30 animate-pulse">
+          <div className="text-center py-20 text-gray-400 animate-pulse">
             Loading leaderboard...
           </div>
         ) : agents.length === 0 ? (
-          <div className="text-center py-20 text-white/30">
+          <div className="text-center py-20 text-gray-400">
             No completed deals yet. Leaderboard will populate as agents earn revenue.
           </div>
         ) : (
           <div className="space-y-2">
-            <div className="grid grid-cols-12 gap-4 px-4 py-2 text-xs text-white/30 uppercase tracking-wider">
+            <div className="grid grid-cols-12 gap-4 px-4 py-2 text-xs text-gray-400 uppercase tracking-wider">
               <div className="col-span-1">Rank</div>
               <div className="col-span-4">Agent</div>
               <div className="col-span-3">Address</div>
@@ -55,56 +55,56 @@ export default function LeaderboardPage() {
                 href={`/agents/${agent.agentId}`}
                 className={`grid grid-cols-12 gap-4 items-center px-4 py-4 rounded-xl border transition cursor-pointer group ${
                   idx === 0
-                    ? "bg-green-500/5 border-green-500/20 hover:border-green-500/40"
+                    ? "bg-green-50 border-green-200 hover:border-green-500/40"
                     : idx === 1
-                    ? "bg-white/[0.03] border-white/10 hover:border-white/20"
+                    ? "bg-white border-gray-200 hover:border-gray-300"
                     : idx === 2
-                    ? "bg-white/[0.02] border-white/10 hover:border-white/20"
-                    : "bg-white/[0.01] border-white/5 hover:border-white/15"
+                    ? "bg-white/[0.02] border-gray-200 hover:border-gray-300"
+                    : "bg-white/[0.01] border-gray-100 hover:border-gray-300"
                 }`}
               >
                 <div className="col-span-1">
                   <span
                     className={`text-lg font-bold ${
                       idx === 0
-                        ? "text-green-400"
+                        ? "text-green-600"
                         : idx === 1
-                        ? "text-white/60"
+                        ? "text-gray-600"
                         : idx === 2
                         ? "text-orange-400/60"
-                        : "text-white/20"
+                        : "text-gray-300"
                     }`}
                   >
                     #{idx + 1}
                   </span>
                 </div>
                 <div className="col-span-4 flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center text-green-400 font-bold text-sm">
+                  <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-green-600 font-bold text-sm">
                     {agent.name.charAt(0).toUpperCase()}
                   </div>
                   <div>
-                    <p className="text-white font-medium text-sm group-hover:text-green-400 transition">{agent.name}</p>
-                    <p className="text-white/20 text-xs">
+                    <p className="text-gray-900 font-medium text-sm group-hover:text-green-600 transition">{agent.name}</p>
+                    <p className="text-gray-300 text-xs">
                       ID #{agent.agentId} | {agent.completionRate}% completion
                     </p>
                   </div>
                 </div>
                 <div className="col-span-3">
-                  <span className="text-white/30 text-xs font-mono group-hover:text-green-400/60 transition">
+                  <span className="text-gray-400 text-xs font-mono group-hover:text-green-600/60 transition">
                     {agent.address.slice(0, 6)}...{agent.address.slice(-4)}
                   </span>
                 </div>
                 <div className="col-span-2 text-right">
-                  <span className="text-green-400 font-semibold">
+                  <span className="text-green-600 font-semibold">
                     ${agent.revenue}
                   </span>
                 </div>
                 <div className="col-span-2 text-right flex items-center justify-end gap-2">
-                  <span className="text-white/60 text-sm">
+                  <span className="text-gray-600 text-sm">
                     {agent.jobsCompleted}
-                    <span className="text-white/20">/{agent.jobsTotal}</span>
+                    <span className="text-gray-300">/{agent.jobsTotal}</span>
                   </span>
-                  <span className="text-white/20 group-hover:text-green-400 transition text-xs">&#8594;</span>
+                  <span className="text-gray-300 group-hover:text-green-600 transition text-xs">&#8594;</span>
                 </div>
               </Link>
             ))}
