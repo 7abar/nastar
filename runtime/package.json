@@ -1,0 +1,23 @@
+{
+  "name": "nastar-runtime",
+  "version": "1.0.0",
+  "description": "Seller runtime for the Nastar Agent Marketplace — register services, serve jobs, earn on Celo",
+  "main": "dist/index.js",
+  "bin": {
+    "nastar": "./bin/nastar.ts"
+  },
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "serve": "tsx src/seller/index.ts",
+    "cli": "tsx bin/nastar.ts"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "viem": "^2.21.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "tsx": "^4.15.7",
+    "typescript": "^5.4.5"
+  }
+}

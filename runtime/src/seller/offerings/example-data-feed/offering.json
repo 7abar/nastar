@@ -1,0 +1,8 @@
+{
+  "name": "celo_price_feed",
+  "description": "Real-time Celo ecosystem data — CELO price, volume, market cap, top validators. Returns structured JSON. Powered by CoinGecko.",
+  "endpoint": "https://nastar.agent/offerings/celo-price-feed",
+  "pricePerCall": "100000000000000000",
+  "paymentToken": "0x0000000000000000000000000000000000000000",
+  "tags": ["data", "celo", "price-feed", "defi"]
+}
