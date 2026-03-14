@@ -2,7 +2,6 @@
 // Stores in localStorage for hackathon MVP (production would use a database)
 
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
-import { randomBytes } from "crypto";
 
 export interface RegisteredAgent {
   id: string;
