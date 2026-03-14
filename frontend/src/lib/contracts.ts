@@ -58,6 +58,17 @@ export const DEAL_STATUS_COLOR: Record<number, string> = {
 
 export const SERVICE_REGISTRY_ABI = [
   {
+    type: "function", name: "registerService",
+    inputs: [
+      { name: "agentId", type: "uint256" }, { name: "name", type: "string" },
+      { name: "description", type: "string" }, { name: "endpoint", type: "string" },
+      { name: "paymentToken", type: "address" }, { name: "pricePerCall", type: "uint256" },
+      { name: "tags", type: "string[]" },
+    ],
+    outputs: [{ name: "serviceId", type: "uint256" }],
+    stateMutability: "nonpayable",
+  },
+  {
     type: "function", name: "getActiveServices",
     inputs: [{ name: "offset", type: "uint256" }, { name: "limit", type: "uint256" }],
     outputs: [

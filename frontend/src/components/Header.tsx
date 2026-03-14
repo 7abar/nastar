@@ -20,8 +20,11 @@ export function Header() {
           <Link href="/chat" className="hover:text-green-400 transition font-medium">
             Chat
           </Link>
+          <Link href="/agents" className="hover:text-white transition">
+            Agents
+          </Link>
           <Link href="/marketplace" className="hover:text-white transition">
-            Marketplace
+            Services
           </Link>
           {authenticated && (
             <Link href="/deals" className="hover:text-white transition">
