@@ -1,8 +1,9 @@
 "use client";
 export const dynamic = "force-dynamic";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback, Suspense } from "react";
 import { usePrivy, useWallets } from "@privy-io/react-auth";
+import { useSearchParams } from "next/navigation";
 import { createPublicClient, http, formatUnits, encodeFunctionData } from "viem";
 import {
   celoSepoliaCustom,
@@ -41,7 +42,15 @@ interface Message {
   action?: "hire" | "confirm_hire";
 }
 
-export default function ChatPage() {
+export default function ChatPageWrapper() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-black" />}>
+      <ChatPage />
+    </Suspense>
+  );
+}
+
+function ChatPage() {
   const { authenticated, login } = usePrivy();
   const { wallets } = useWallets();
   const [messages, setMessages] = useState<Message[]>([
@@ -54,7 +63,9 @@ export default function ChatPage() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [services, setServices] = useState<Service[]>([]);
+  const [prefilled, setPrefilled] = useState(false);
   const messagesEnd = useRef<HTMLDivElement>(null);
+  const searchParams = useSearchParams();
 
   useEffect(() => {
     messagesEnd.current?.scrollIntoView({ behavior: "smooth" });
@@ -75,6 +86,17 @@ export default function ChatPage() {
     }
     load();
   }, []);
+
+  // Pre-fill from query params (e.g. /chat?agent=40&name=CeloDataFeed)
+  useEffect(() => {
+    if (prefilled) return;
+    const agentId = searchParams.get("agent");
+    const agentName = searchParams.get("name");
+    if (agentId && agentName) {
+      setInput(`I want to hire Agent #${agentId} — ${agentName}`);
+      setPrefilled(true);
+    }
+  }, [searchParams, prefilled]);
 
   function addMsg(msg: Omit<Message, "id">) {
     const m = { ...msg, id: Date.now().toString() + Math.random() };

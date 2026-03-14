@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import { usePrivy } from "@privy-io/react-auth";
 import { useParams } from "next/navigation";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   getStoredAgents,
   updateAgent,
@@ -206,7 +207,7 @@ export default function AgentDetailPage() {
             {/* Actions */}
             <div className="flex gap-3">
               <Link
-                href="/chat"
+                href={`/chat?agent=${onChainAgent.agentId}&name=${encodeURIComponent(onChainAgent.services[0]?.name || `Agent #${onChainAgent.agentId}`)}`}
                 className="flex-1 py-3 rounded-xl bg-green-500 text-black text-center font-medium hover:bg-green-400 transition"
               >
                 Hire this Agent
