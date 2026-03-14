@@ -35,18 +35,20 @@ import {IERC721} from "forge-std/interfaces/IERC721.sol";
 
 /**
  * @title NastarEscrow
- * @notice Escrow contract for agent-to-agent service deals on Celo.
+ * @notice Hardened escrow for agent service deals on Celo.
  *         Integrates with ERC-8004 Identity Registry and ServiceRegistry.
  *         Supports any Celo stablecoin (USDm, USDC, USDT, KESm, NGNm, etc.)
  * @author JABAR x NASTAR
  *
  * Security model:
- *   - Funds are held by this contract until deal resolves
- *   - Seller address locked at creation (ownerOf(sellerAgentId) at deal time)
- *   - Disputes: seller can contest within DISPUTE_TIMEOUT (50/50 split)
- *   - Uncontested disputes: buyer refund after DISPUTE_TIMEOUT
- *   - 2.5% protocol fee on seller payments (no fee on buyer refunds)
- *   - State updated before external calls (CEI pattern)
+ *   - ReentrancyGuard on all fund-moving functions
+ *   - SafeERC20 transfers (handles non-standard tokens like USDT)
+ *   - CEI pattern: state updated before external calls
+ *   - Same-wallet self-deal prevention (anti-reputation-gaming)
+ *   - Minimum deal amount prevents dust/griefing attacks
+ *   - Minimum deadline prevents uncompleable deals
+ *   - Clean dispute timeout boundary (no race condition)
+ *   - 2.5% protocol fee on seller payments only (refunds are fee-free)
  */
 contract NastarEscrow {
     // ──────────────────────────────────────────────
@@ -97,12 +99,14 @@ contract NastarEscrow {
     mapping(uint256 => uint256[]) public agentDealsAsBuyer;
     mapping(uint256 => uint256[]) public agentDealsAsSeller;
 
+    /// @dev ReentrancyGuard state
+    uint256 private _locked = 1;
+
     // ──────────────────────────────────────────────
     // Constants
     // ──────────────────────────────────────────────
 
     /// @notice Protocol fee in basis points (250 = 2.5%).
-    /// Taken from seller payment only. Buyer refunds are fee-free.
     uint256 public constant PROTOCOL_FEE_BPS = 250;
 
     /// @notice Seller has 3 days to contest or respond after a dispute.
@@ -111,11 +115,17 @@ contract NastarEscrow {
     /// @notice Maximum allowed deal deadline from creation.
     uint256 public constant MAX_DEADLINE = 30 days;
 
-    /// @notice Seller can force-claim payment if buyer is unresponsive this long after delivery.
+    /// @notice Minimum deadline duration from creation. Prevents uncompleable deals.
+    uint256 public constant MIN_DEADLINE = 1 hours;
+
+    /// @notice Seller can force-claim payment if buyer is unresponsive this long after deadline.
     uint256 public constant DELIVERY_TIMEOUT = 7 days;
 
     /// @notice If buyer disputes but never claims refund, seller can reclaim after this timeout.
     uint256 public constant ABANDONED_DISPUTE_TIMEOUT = 30 days;
+
+    /// @notice Minimum deal amount to prevent dust/griefing attacks.
+    uint256 public constant MIN_AMOUNT = 1000; // 0.001 USDC (6 decimals)
 
     // ──────────────────────────────────────────────
     // Events
@@ -149,15 +159,30 @@ contract NastarEscrow {
     error InvalidStatus(DealStatus expected, DealStatus actual);
     error NotRefundable();
     error DeadlineTooLong();
+    error DeadlineTooShort();
     error DealExpiredError();
     error TransferFailed();
     error ZeroAmount();
+    error AmountTooSmall();
     error ZeroAddress();
     error DisputeTimeoutNotReached(uint256 canRefundAt, uint256 now_);
     error DisputeTimeoutReached();
     error DeliveryTimeoutNotReached(uint256 canClaimAt, uint256 now_);
     error AbandonedDisputeTimeoutNotReached(uint256 canClaimAt, uint256 now_);
     error SelfDeal();
+    error ReentrancyDetected();
+
+    // ──────────────────────────────────────────────
+    // Modifiers
+    // ──────────────────────────────────────────────
+
+    /// @dev Prevents reentrant calls to fund-moving functions.
+    modifier nonReentrant() {
+        if (_locked != 1) revert ReentrancyDetected();
+        _locked = 2;
+        _;
+        _locked = 1;
+    }
 
     // ──────────────────────────────────────────────
     // Constructor
@@ -179,6 +204,13 @@ contract NastarEscrow {
     /**
      * @notice Create a deal and escrow payment.
      *         Buyer must own the buyerAgentId NFT and have approved this contract.
+     *
+     * Security:
+     *   - ReentrancyGuard (external ERC-20 call)
+     *   - Self-deal check: agentId AND wallet address
+     *   - Minimum amount prevents dust attacks
+     *   - Minimum deadline prevents uncompleable deals
+     *   - SafeERC20 for token transfer
      */
     function createDeal(
         uint256 serviceId,
@@ -188,15 +220,20 @@ contract NastarEscrow {
         uint256 amount,
         string calldata taskDescription,
         uint256 deadline
-    ) external returns (uint256 dealId) {
+    ) external nonReentrant returns (uint256 dealId) {
         if (identityRegistry.ownerOf(buyerAgentId) != msg.sender) revert NotAgentOwner();
         if (buyerAgentId == sellerAgentId) revert SelfDeal();
         if (amount == 0) revert ZeroAmount();
+        if (amount < MIN_AMOUNT) revert AmountTooSmall();
         if (paymentToken == address(0)) revert ZeroAddress();
         if (deadline > block.timestamp + MAX_DEADLINE) revert DeadlineTooLong();
-        if (deadline <= block.timestamp) revert DealExpiredError();
+        if (deadline < block.timestamp + MIN_DEADLINE) revert DeadlineTooShort();
 
+        // Capture seller address at deal creation time
         address seller = identityRegistry.ownerOf(sellerAgentId);
+
+        // Prevent same-wallet self-dealing (anti-reputation-gaming)
+        if (msg.sender == seller) revert SelfDeal();
 
         // CEI: assign state before external call
         dealId = nextDealId++;
@@ -224,8 +261,7 @@ contract NastarEscrow {
 
         emit DealCreated(dealId, buyerAgentId, sellerAgentId, serviceId, paymentToken, amount, deadline);
 
-        bool success = IERC20(paymentToken).transferFrom(msg.sender, address(this), amount);
-        if (!success) revert TransferFailed();
+        _safeTransferFrom(IERC20(paymentToken), msg.sender, address(this), amount);
     }
 
     /**
@@ -258,12 +294,11 @@ contract NastarEscrow {
     /**
      * @notice Buyer confirms delivery, releasing escrowed funds to seller (minus fee).
      */
-    function confirmDelivery(uint256 dealId) external {
+    function confirmDelivery(uint256 dealId) external nonReentrant {
         Deal storage deal = deals[dealId];
         _requireStatus(deal, DealStatus.Delivered);
         if (deal.buyer != msg.sender) revert NotBuyer();
 
-        // CEI: update state before transfer
         deal.status = DealStatus.Completed;
         deal.completedAt = block.timestamp;
 
@@ -287,19 +322,18 @@ contract NastarEscrow {
 
     /**
      * @notice Seller contests a dispute within the DISPUTE_TIMEOUT window.
-     *         Funds are split 50/50 (minus protocol fee) — neither side can
-     *         fully scam the other.
+     *         Funds are split 50/50 (minus protocol fee).
      *
-     *         Timeline: disputeDeal() → seller has 3 days to call contestDispute()
-     *         After 3 days without contest → buyer claims full refund.
+     *         Window: [disputedAt, disputedAt + DISPUTE_TIMEOUT)
+     *         After DISPUTE_TIMEOUT: only buyer can claim full refund.
      */
-    function contestDispute(uint256 dealId) external {
+    function contestDispute(uint256 dealId) external nonReentrant {
         Deal storage deal = deals[dealId];
         _requireStatus(deal, DealStatus.Disputed);
         if (deal.seller != msg.sender) revert NotSeller();
 
-        // Seller must contest within DISPUTE_TIMEOUT
-        if (block.timestamp > deal.disputedAt + DISPUTE_TIMEOUT) revert DisputeTimeoutReached();
+        // Strict boundary: seller must contest BEFORE timeout, not at it
+        if (block.timestamp >= deal.disputedAt + DISPUTE_TIMEOUT) revert DisputeTimeoutReached();
 
         // CEI: update state before transfers
         deal.status = DealStatus.Resolved;
@@ -316,20 +350,14 @@ contract NastarEscrow {
 
         emit DealContested(dealId, buyerAmount, sellerAmount, fee);
 
-        // Transfer fee
         if (fee > 0) {
-            bool s1 = IERC20(token).transfer(feeRecipient, fee);
-            if (!s1) revert TransferFailed();
+            _safeTransfer(IERC20(token), feeRecipient, fee);
         }
-        // Transfer buyer's half
         if (buyerAmount > 0) {
-            bool s2 = IERC20(token).transfer(deal.buyer, buyerAmount);
-            if (!s2) revert TransferFailed();
+            _safeTransfer(IERC20(token), deal.buyer, buyerAmount);
         }
-        // Transfer seller's half
         if (sellerAmount > 0) {
-            bool s3 = IERC20(token).transfer(deal.seller, sellerAmount);
-            if (!s3) revert TransferFailed();
+            _safeTransfer(IERC20(token), deal.seller, sellerAmount);
         }
     }
 
@@ -341,7 +369,7 @@ contract NastarEscrow {
      *
      * Refunds are fee-free — buyer always gets full amount back.
      */
-    function claimRefund(uint256 dealId) external {
+    function claimRefund(uint256 dealId) external nonReentrant {
         Deal storage deal = deals[dealId];
         if (deal.buyer != msg.sender) revert NotBuyer();
 
@@ -367,22 +395,19 @@ contract NastarEscrow {
 
         if (!canRefund) revert NotRefundable();
 
-        // No fee on refunds — buyer gets full amount
         address buyer = deal.buyer;
         address token = deal.paymentToken;
         uint256 amount = deal.amount;
 
         emit DealRefunded(dealId, amount);
 
-        bool success = IERC20(token).transfer(buyer, amount);
-        if (!success) revert TransferFailed();
+        _safeTransfer(IERC20(token), buyer, amount);
     }
 
     /**
      * @notice Seller force-claims payment if buyer is unresponsive after delivery.
-     *         Buyer has DELIVERY_TIMEOUT after deadline to confirm or dispute.
      */
-    function sellerClaimAfterTimeout(uint256 dealId) external {
+    function sellerClaimAfterTimeout(uint256 dealId) external nonReentrant {
         Deal storage deal = deals[dealId];
         _requireStatus(deal, DealStatus.Delivered);
         if (deal.seller != msg.sender) revert NotSeller();
@@ -392,7 +417,6 @@ contract NastarEscrow {
             revert DeliveryTimeoutNotReached(canClaimAt, block.timestamp);
         }
 
-        // CEI: update state before transfer
         deal.status = DealStatus.Completed;
         deal.completedAt = block.timestamp;
 
@@ -401,9 +425,8 @@ contract NastarEscrow {
 
     /**
      * @notice Seller reclaims funds from an abandoned dispute.
-     *         If buyer disputed but never claimed refund within 30 days.
      */
-    function sellerClaimFromAbandonedDispute(uint256 dealId) external {
+    function sellerClaimFromAbandonedDispute(uint256 dealId) external nonReentrant {
         Deal storage deal = deals[dealId];
         _requireStatus(deal, DealStatus.Disputed);
         if (deal.seller != msg.sender) revert NotSeller();
@@ -413,7 +436,6 @@ contract NastarEscrow {
             revert AbandonedDisputeTimeoutNotReached(canClaimAt, block.timestamp);
         }
 
-        // CEI: update state before transfer
         deal.status = DealStatus.Completed;
         deal.completedAt = block.timestamp;
 
@@ -445,8 +467,7 @@ contract NastarEscrow {
     }
 
     /**
-     * @dev Pay seller with protocol fee deducted. Used by confirmDelivery,
-     *      sellerClaimAfterTimeout, and sellerClaimFromAbandonedDispute.
+     * @dev Pay seller with protocol fee deducted.
      *      MUST be called AFTER status is set to terminal (CEI).
      */
     function _paySellerWithFee(Deal storage deal) internal {
@@ -458,11 +479,34 @@ contract NastarEscrow {
         emit DealCompleted(deal.dealId, sellerAmount, fee);
 
         if (fee > 0) {
-            bool s1 = IERC20(token).transfer(feeRecipient, fee);
-            if (!s1) revert TransferFailed();
+            _safeTransfer(IERC20(token), feeRecipient, fee);
         }
 
-        bool s2 = IERC20(token).transfer(deal.seller, sellerAmount);
-        if (!s2) revert TransferFailed();
+        _safeTransfer(IERC20(token), deal.seller, sellerAmount);
+    }
+
+    /**
+     * @dev Safe ERC-20 transfer. Handles tokens that don't return bool (e.g., USDT).
+     *      Reverts on failure or false return.
+     */
+    function _safeTransfer(IERC20 token, address to, uint256 amount) internal {
+        (bool success, bytes memory data) = address(token).call(
+            abi.encodeWithSelector(IERC20.transfer.selector, to, amount)
+        );
+        if (!success || (data.length > 0 && !abi.decode(data, (bool)))) {
+            revert TransferFailed();
+        }
+    }
+
+    /**
+     * @dev Safe ERC-20 transferFrom. Handles tokens that don't return bool.
+     */
+    function _safeTransferFrom(IERC20 token, address from, address to, uint256 amount) internal {
+        (bool success, bytes memory data) = address(token).call(
+            abi.encodeWithSelector(IERC20.transferFrom.selector, from, to, amount)
+        );
+        if (!success || (data.length > 0 && !abi.decode(data, (bool)))) {
+            revert TransferFailed();
+        }
     }
 }

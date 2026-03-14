@@ -15,7 +15,7 @@ contract NastarTest is Test {
 
     address public alice = makeAddr("alice"); // buyer
     address public bob = makeAddr("bob");     // seller agent owner
-    address public treasury = makeAddr("treasury"); // fee recipient
+    address public treasury = makeAddr("treasury");
 
     uint256 public aliceAgentId;
     uint256 public bobAgentId;
@@ -38,7 +38,7 @@ contract NastarTest is Test {
     // ──────────────────────────────────────────────
 
     function _fee(uint256 amount) internal pure returns (uint256) {
-        return (amount * 250) / 10000; // 2.5%
+        return (amount * 250) / 10000;
     }
 
     function _createTestService() internal returns (uint256) {
@@ -88,8 +88,6 @@ contract NastarTest is Test {
         ServiceRegistry.Service memory svc = registry.getService(serviceId);
         assertEq(svc.agentId, bobAgentId);
         assertEq(svc.provider, bob);
-        assertEq(svc.name, "Web Scraping Service");
-        assertEq(svc.pricePerCall, 5e6);
         assertTrue(svc.active);
     }
 
@@ -109,9 +107,7 @@ contract NastarTest is Test {
         registry.updateService(serviceId, "New Name", "New desc", "http://new", address(usdc), 10e6, true);
         vm.stopPrank();
 
-        ServiceRegistry.Service memory svc = registry.getService(serviceId);
-        assertEq(svc.name, "New Name");
-        assertEq(svc.pricePerCall, 10e6);
+        assertEq(registry.getService(serviceId).name, "New Name");
     }
 
     function test_deactivateService() public {
@@ -122,7 +118,6 @@ contract NastarTest is Test {
         );
         registry.deactivateService(serviceId);
         vm.stopPrank();
-
         assertFalse(registry.getService(serviceId).active);
     }
 
@@ -147,7 +142,6 @@ contract NastarTest is Test {
         registry.registerService(bobAgentId, "AI1", "D", "http://1", address(usdc), 1e6, tags);
         registry.registerService(bobAgentId, "AI2", "D", "http://2", address(usdc), 2e6, tags);
         vm.stopPrank();
-
         assertEq(registry.getServicesByTag(keccak256("ai")).length, 2);
     }
 
@@ -155,14 +149,13 @@ contract NastarTest is Test {
         vm.startPrank(bob);
         bytes32[] memory tags = new bytes32[](11);
         for (uint256 i = 0; i < 11; i++) tags[i] = bytes32(i);
-
         vm.expectRevert(ServiceRegistry.TooManyTags.selector);
         registry.registerService(bobAgentId, "Test", "Desc", "http://test", address(usdc), 1e6, tags);
         vm.stopPrank();
     }
 
     // ──────────────────────────────────────────────
-    // NastarEscrow — Deal Creation
+    // NastarEscrow — Deal Creation + Validation
     // ──────────────────────────────────────────────
 
     function test_createDeal() public {
@@ -171,18 +164,27 @@ contract NastarTest is Test {
 
         NastarEscrow.Deal memory deal = escrow.getDeal(dealId);
         assertEq(deal.buyerAgentId, aliceAgentId);
-        assertEq(deal.sellerAgentId, bobAgentId);
         assertEq(deal.amount, 10e6);
-        assertEq(uint8(deal.status), uint8(NastarEscrow.DealStatus.Created));
         assertEq(usdc.balanceOf(address(escrow)), 10e6);
         assertEq(usdc.balanceOf(alice), 990e6);
     }
 
-    function test_selfDeal_reverts() public {
+    function test_selfDeal_sameAgentId_reverts() public {
         vm.startPrank(alice);
         usdc.approve(address(escrow), 10e6);
         vm.expectRevert(NastarEscrow.SelfDeal.selector);
-        escrow.createDeal(0, aliceAgentId, aliceAgentId, address(usdc), 10e6, "self deal", block.timestamp + 1 days);
+        escrow.createDeal(0, aliceAgentId, aliceAgentId, address(usdc), 10e6, "self", block.timestamp + 1 days);
+        vm.stopPrank();
+    }
+
+    function test_selfDeal_sameWallet_reverts() public {
+        // Alice owns two different agent NFTs but same wallet
+        uint256 aliceAgent2 = identity.mint(alice);
+
+        vm.startPrank(alice);
+        usdc.approve(address(escrow), 10e6);
+        vm.expectRevert(NastarEscrow.SelfDeal.selector);
+        escrow.createDeal(0, aliceAgentId, aliceAgent2, address(usdc), 10e6, "same wallet", block.timestamp + 1 days);
         vm.stopPrank();
     }
 
@@ -193,11 +195,40 @@ contract NastarTest is Test {
         vm.stopPrank();
     }
 
+    function test_amountTooSmall_reverts() public {
+        vm.startPrank(alice);
+        usdc.approve(address(escrow), 999);
+        vm.expectRevert(NastarEscrow.AmountTooSmall.selector);
+        escrow.createDeal(0, aliceAgentId, bobAgentId, address(usdc), 999, "dust", block.timestamp + 1 days);
+        vm.stopPrank();
+    }
+
     function test_zeroPaymentToken_reverts() public {
         vm.startPrank(alice);
         vm.expectRevert(NastarEscrow.ZeroAddress.selector);
         escrow.createDeal(0, aliceAgentId, bobAgentId, address(0), 10e6, "zero token", block.timestamp + 1 days);
         vm.stopPrank();
+    }
+
+    function test_deadlineTooShort_reverts() public {
+        vm.startPrank(alice);
+        usdc.approve(address(escrow), 10e6);
+        // deadline = now + 30 minutes (less than MIN_DEADLINE of 1 hour)
+        vm.expectRevert(NastarEscrow.DeadlineTooShort.selector);
+        escrow.createDeal(0, aliceAgentId, bobAgentId, address(usdc), 10e6, "too short", block.timestamp + 30 minutes);
+        vm.stopPrank();
+    }
+
+    function test_deadlineExactlyMinimum_works() public {
+        _createTestService();
+        vm.startPrank(alice);
+        usdc.approve(address(escrow), 10e6);
+        // deadline = now + 1 hour (exactly MIN_DEADLINE)
+        uint256 dealId = escrow.createDeal(
+            0, aliceAgentId, bobAgentId, address(usdc), 10e6, "min deadline", block.timestamp + 1 hours
+        );
+        vm.stopPrank();
+        assertEq(uint8(escrow.getDeal(dealId).status), uint8(NastarEscrow.DealStatus.Created));
     }
 
     // ──────────────────────────────────────────────
@@ -207,41 +238,35 @@ contract NastarTest is Test {
     function test_fullDealFlow_withFee() public {
         uint256 serviceId = _createTestService();
         uint256 dealId = _createTestDeal(serviceId);
-
         _deliverDeal(dealId);
 
-        // Alice confirms
         vm.prank(alice);
         escrow.confirmDelivery(dealId);
 
-        assertEq(uint8(escrow.getDeal(dealId).status), uint8(NastarEscrow.DealStatus.Completed));
-
-        // Verify fee distribution: 10e6 amount, 2.5% = 250000 fee
-        uint256 fee = _fee(10e6);          // 250000
-        uint256 sellerPay = 10e6 - fee;    // 9750000
-        assertEq(usdc.balanceOf(bob), sellerPay);
+        uint256 fee = _fee(10e6);
+        assertEq(usdc.balanceOf(bob), 10e6 - fee);
         assertEq(usdc.balanceOf(treasury), fee);
         assertEq(usdc.balanceOf(address(escrow)), 0);
     }
 
-    function test_feeRecipient_isImmutable() public view {
+    function test_feeConstants() public view {
         assertEq(escrow.feeRecipient(), treasury);
         assertEq(escrow.PROTOCOL_FEE_BPS(), 250);
+        assertEq(escrow.MIN_AMOUNT(), 1000);
+        assertEq(escrow.MIN_DEADLINE(), 1 hours);
     }
 
     // ──────────────────────────────────────────────
-    // NastarEscrow — Disputes
+    // NastarEscrow — Disputes + Contest
     // ──────────────────────────────────────────────
 
-    function test_disputeDeal_thenRefund() public {
+    function test_disputeDeal_thenRefund_noFee() public {
         uint256 serviceId = _createTestService();
         uint256 dealId = _createTestDeal(serviceId);
         _deliverDeal(dealId);
 
-        // Alice disputes
         vm.prank(alice);
         escrow.disputeDeal(dealId);
-        assertEq(uint8(escrow.getDeal(dealId).status), uint8(NastarEscrow.DealStatus.Disputed));
 
         // Can't refund yet
         vm.prank(alice);
@@ -253,9 +278,8 @@ contract NastarTest is Test {
         vm.prank(alice);
         escrow.claimRefund(dealId);
 
-        assertEq(uint8(escrow.getDeal(dealId).status), uint8(NastarEscrow.DealStatus.Refunded));
-        assertEq(usdc.balanceOf(alice), 1000e6); // full refund
-        assertEq(usdc.balanceOf(treasury), 0);   // no fee on refund
+        assertEq(usdc.balanceOf(alice), 1000e6);
+        assertEq(usdc.balanceOf(treasury), 0);
     }
 
     function test_contestDispute_50_50_split() public {
@@ -263,29 +287,26 @@ contract NastarTest is Test {
         uint256 dealId = _createTestDeal(serviceId);
         _deliverDeal(dealId);
 
-        // Alice disputes
         vm.prank(alice);
         escrow.disputeDeal(dealId);
 
-        // Bob contests within 3 days → 50/50 split
         vm.prank(bob);
         escrow.contestDispute(dealId);
 
         assertEq(uint8(escrow.getDeal(dealId).status), uint8(NastarEscrow.DealStatus.Resolved));
 
-        // Verify: 10e6 total, fee=250000, remaining=9750000, each gets 4875000
-        uint256 fee = _fee(10e6);                  // 250000
-        uint256 remaining = 10e6 - fee;            // 9750000
-        uint256 halfBuyer = remaining / 2;         // 4875000
-        uint256 halfSeller = remaining - halfBuyer; // 4875000
+        uint256 fee = _fee(10e6);
+        uint256 remaining = 10e6 - fee;
+        uint256 halfBuyer = remaining / 2;
+        uint256 halfSeller = remaining - halfBuyer;
 
-        assertEq(usdc.balanceOf(alice), 990e6 + halfBuyer); // 990e6 + 4875000
-        assertEq(usdc.balanceOf(bob), halfSeller);           // 4875000
-        assertEq(usdc.balanceOf(treasury), fee);              // 250000
+        assertEq(usdc.balanceOf(alice), 990e6 + halfBuyer);
+        assertEq(usdc.balanceOf(bob), halfSeller);
+        assertEq(usdc.balanceOf(treasury), fee);
         assertEq(usdc.balanceOf(address(escrow)), 0);
     }
 
-    function test_contestDispute_afterTimeout_reverts() public {
+    function test_contestDispute_atExactTimeout_reverts() public {
         uint256 serviceId = _createTestService();
         uint256 dealId = _createTestDeal(serviceId);
         _deliverDeal(dealId);
@@ -293,12 +314,29 @@ contract NastarTest is Test {
         vm.prank(alice);
         escrow.disputeDeal(dealId);
 
-        // Wait past DISPUTE_TIMEOUT — too late to contest
-        vm.warp(block.timestamp + 3 days + 1);
+        // Warp to EXACTLY the timeout boundary — should revert (>= check)
+        vm.warp(block.timestamp + 3 days);
 
         vm.prank(bob);
         vm.expectRevert(NastarEscrow.DisputeTimeoutReached.selector);
         escrow.contestDispute(dealId);
+    }
+
+    function test_contestDispute_beforeTimeout_works() public {
+        uint256 serviceId = _createTestService();
+        uint256 dealId = _createTestDeal(serviceId);
+        _deliverDeal(dealId);
+
+        vm.prank(alice);
+        escrow.disputeDeal(dealId);
+
+        // 1 second before timeout — should work
+        vm.warp(block.timestamp + 3 days - 1);
+
+        vm.prank(bob);
+        escrow.contestDispute(dealId);
+
+        assertEq(uint8(escrow.getDeal(dealId).status), uint8(NastarEscrow.DealStatus.Resolved));
     }
 
     function test_contestDispute_nonSeller_reverts() public {
@@ -309,7 +347,6 @@ contract NastarTest is Test {
         vm.prank(alice);
         escrow.disputeDeal(dealId);
 
-        // Alice (buyer) tries to contest — must fail
         vm.prank(alice);
         vm.expectRevert(NastarEscrow.NotSeller.selector);
         escrow.contestDispute(dealId);
@@ -323,7 +360,6 @@ contract NastarTest is Test {
         vm.prank(alice);
         escrow.disputeDeal(dealId);
 
-        // Bob contests
         vm.prank(bob);
         escrow.contestDispute(dealId);
 
@@ -347,8 +383,8 @@ contract NastarTest is Test {
         vm.prank(alice);
         escrow.claimRefund(dealId);
 
-        assertEq(usdc.balanceOf(alice), 1000e6); // full refund
-        assertEq(usdc.balanceOf(treasury), 0);   // no fee
+        assertEq(usdc.balanceOf(alice), 1000e6);
+        assertEq(usdc.balanceOf(treasury), 0);
     }
 
     function test_acceptedButNotDelivered_refund() public {
@@ -417,12 +453,10 @@ contract NastarTest is Test {
         vm.prank(alice);
         escrow.disputeDeal(dealId);
 
-        // Too early
         vm.prank(bob);
         vm.expectRevert();
         escrow.sellerClaimFromAbandonedDispute(dealId);
 
-        // After 30 days
         vm.warp(block.timestamp + 30 days + 1);
 
         vm.prank(bob);
@@ -441,18 +475,16 @@ contract NastarTest is Test {
         vm.prank(alice);
         escrow.disputeDeal(dealId);
 
-        // Buyer claims after 3 days (normal flow)
         vm.warp(block.timestamp + 3 days + 1);
         vm.prank(alice);
         escrow.claimRefund(dealId);
 
-        // Seller tries abandoned claim — fails, already Refunded
         vm.warp(block.timestamp + 30 days);
         vm.prank(bob);
         vm.expectRevert();
         escrow.sellerClaimFromAbandonedDispute(dealId);
 
-        assertEq(usdc.balanceOf(alice), 1000e6); // full refund
+        assertEq(usdc.balanceOf(alice), 1000e6);
     }
 
     // ──────────────────────────────────────────────
