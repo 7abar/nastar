@@ -34,6 +34,22 @@ interface OnChainAgent {
   completionRate: number;
 }
 
+function getTagsFromServices(services: OnChainAgent["services"]): string[] {
+  const tags = new Set<string>();
+  for (const svc of services) {
+    const n = svc.name.toLowerCase();
+    if (n.includes("data") || n.includes("feed")) tags.add("Data Feeds");
+    if (n.includes("audit") || n.includes("security")) tags.add("Security");
+    if (n.includes("nft") || n.includes("mint")) tags.add("NFT");
+    if (n.includes("tweet") || n.includes("compose") || n.includes("social")) tags.add("Social");
+    if (n.includes("swap") || n.includes("route") || n.includes("defi")) tags.add("DeFi");
+    if (n.includes("translat")) tags.add("Translation");
+    if (n.includes("analy") || n.includes("chain")) tags.add("Analytics");
+    if (n.includes("scrap") || n.includes("web")) tags.add("Web Scraping");
+  }
+  return [...tags];
+}
+
 export default function AgentDetailPage() {
   const { id } = useParams();
   const { user } = usePrivy();
@@ -45,7 +61,6 @@ export default function AgentDetailPage() {
 
   useEffect(() => {
     async function load() {
-      // Try localStorage first
       const agents = getStoredAgents();
       const found = agents.find((a) => a.id === id);
       if (found) {
@@ -54,7 +69,6 @@ export default function AgentDetailPage() {
         return;
       }
 
-      // Fetch from API (on-chain data)
       try {
         const [servicesRes, lbRes] = await Promise.all([
           fetch(`${API_URL}/v1/services`),
@@ -62,8 +76,6 @@ export default function AgentDetailPage() {
         ]);
         const services = await servicesRes.json();
         const leaderboard = await lbRes.json();
-
-        // Find services for this agentId
         const agentId = Number(id);
         const agentServices = services.filter((s: any) => s.agentId === agentId);
 
@@ -96,7 +108,7 @@ export default function AgentDetailPage() {
     load();
   }, [id]);
 
-  function copyToClipboard(text: string, label: string) {
+  function copy(text: string, label: string) {
     navigator.clipboard.writeText(text);
     setCopied(label);
     setTimeout(() => setCopied(null), 2000);
@@ -104,325 +116,298 @@ export default function AgentDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center text-white/30 animate-pulse">
+      <div className="min-h-screen bg-black flex items-center justify-center text-white/20 animate-pulse text-sm">
         Loading agent...
       </div>
     );
   }
 
-  // ── On-chain agent view ────────────────────────────────────────────────
+  // ── On-chain agent ─────────────────────────────────────────────────────
   if (onChainAgent) {
-    const allTags = onChainAgent.services.map((svc) => {
-      const n = svc.name.toLowerCase();
-      const tags: string[] = [];
-      if (n.includes("data") || n.includes("feed")) tags.push("data-feeds");
-      if (n.includes("audit")) tags.push("security-audit");
-      if (n.includes("nft")) tags.push("NFT");
-      if (n.includes("tweet") || n.includes("compose")) tags.push("social-media");
-      if (n.includes("swap") || n.includes("route")) tags.push("DeFi");
-      if (n.includes("translat")) tags.push("translation");
-      if (n.includes("analy")) tags.push("analytics");
-      if (n.includes("scrap")) tags.push("web-scraping");
-      return tags;
-    }).flat().filter((v, i, a) => a.indexOf(v) === i);
-
+    const tags = getTagsFromServices(onChainAgent.services);
     const minPrice = Math.min(...onChainAgent.services.map((s) => parseFloat(s.pricePerCall) || 0));
     const maxPrice = Math.max(...onChainAgent.services.map((s) => parseFloat(s.pricePerCall) || 0));
-    const priceRange = minPrice === maxPrice ? `${minPrice} USDC` : `${minPrice} - ${maxPrice} USDC`;
 
     return (
       <div className="min-h-screen bg-black text-white">
-        {/* Hero banner */}
-        <div className="border-b border-white/10 bg-gradient-to-b from-green-500/5 to-transparent">
-          <div className="max-w-4xl mx-auto px-4 py-8">
-            <div className="flex flex-col md:flex-row md:items-start gap-6">
-              {/* Avatar + info */}
-              <div className="flex items-start gap-4 flex-1">
-                <div className="w-20 h-20 rounded-2xl bg-green-500/20 border border-green-500/30 flex items-center justify-center text-green-400 font-bold text-3xl shrink-0">
-                  {onChainAgent.name.charAt(0).toUpperCase()}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h1 className="text-2xl font-bold">Agent #{onChainAgent.agentId}</h1>
-                  <div className="flex items-center gap-2 mt-1 flex-wrap">
-                    <code className="text-white/30 text-xs font-mono">
-                      {onChainAgent.address.slice(0, 6)}...{onChainAgent.address.slice(-4)}
-                    </code>
-                    <button
-                      onClick={() => copyToClipboard(onChainAgent.address, "addr")}
-                      className="text-white/20 hover:text-white text-xs"
-                    >
-                      {copied === "addr" ? "Copied!" : "Copy"}
-                    </button>
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-green-500/10 text-green-400 text-xs">
-                      <span className="w-1.5 h-1.5 rounded-full bg-green-400" />
-                      Active
-                    </span>
-                  </div>
-                  {/* Tags */}
-                  <div className="flex flex-wrap gap-1.5 mt-3">
-                    {allTags.map((tag) => (
-                      <span key={tag} className="px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-white/50 text-xs">
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              </div>
+        <div className="max-w-3xl mx-auto px-4 py-8 md:py-12">
 
-              {/* CTA — always visible, no scroll needed */}
-              <div className="flex flex-col gap-2 md:w-56 shrink-0">
-                <Link
-                  href={`/chat?agent=${onChainAgent.agentId}&name=${encodeURIComponent(onChainAgent.services[0]?.name || `Agent #${onChainAgent.agentId}`)}`}
-                  className="py-3 rounded-xl bg-green-500 text-black text-center font-semibold hover:bg-green-400 transition text-sm"
-                >
-                  Hire this Agent
-                </Link>
-                <div className="flex gap-2">
-                  <a
-                    href={`https://sepolia.celoscan.io/address/${onChainAgent.address}`}
-                    target="_blank"
-                    className="flex-1 py-2 rounded-lg bg-white/5 border border-white/10 text-white/60 text-center text-xs hover:bg-white/10 transition"
-                  >
-                    CeloScan
-                  </a>
-                  <a
-                    href={`https://agentscan.info/agents?search=${onChainAgent.address}`}
-                    target="_blank"
-                    className="flex-1 py-2 rounded-lg bg-white/5 border border-white/10 text-white/60 text-center text-xs hover:bg-white/10 transition"
-                  >
-                    Agentscan
-                  </a>
-                </div>
-                <p className="text-white/20 text-xs text-center">
-                  {priceRange} per call
-                </p>
-              </div>
+          {/* ── Header row ── */}
+          <div className="flex items-start gap-4 mb-6">
+            {/* Avatar */}
+            <div className="w-14 h-14 rounded-xl bg-green-500/15 border border-green-500/20 flex items-center justify-center text-green-400 font-bold text-xl shrink-0">
+              {onChainAgent.name.charAt(0).toUpperCase()}
             </div>
-          </div>
-        </div>
-
-        {/* Content */}
-        <div className="max-w-4xl mx-auto px-4 py-8">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Left column — stats + identity */}
-            <div className="space-y-4">
-              {/* Stats */}
-              <div className="p-4 rounded-xl bg-green-500/5 border border-green-500/20">
-                <h3 className="text-xs text-white/30 uppercase tracking-wider mb-3">Performance</h3>
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-white/50 text-sm">Revenue</span>
-                    <span className="text-green-400 font-bold text-lg">${onChainAgent.revenue}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-white/50 text-sm">Jobs Done</span>
-                    <span className="text-white font-bold">{onChainAgent.jobsCompleted}/{onChainAgent.jobsTotal}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-white/50 text-sm">Completion</span>
-                    <span className="text-white font-bold">{onChainAgent.completionRate}%</span>
-                  </div>
-                </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-xl font-bold">Agent #{onChainAgent.agentId}</h1>
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-500/10 text-green-400 text-xs">
+                  <span className="w-1.5 h-1.5 rounded-full bg-green-400" />
+                  Active
+                </span>
               </div>
-
-              {/* Identity */}
-              <div className="p-4 rounded-xl bg-white/5 border border-white/10">
-                <h3 className="text-xs text-white/30 uppercase tracking-wider mb-3">Identity</h3>
-                <div className="space-y-2.5 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-white/40">NFT ID</span>
-                    <span className="text-white font-mono text-xs">#{onChainAgent.agentId} (ERC-8004)</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-white/40">Network</span>
-                    <span className="text-green-400 text-xs">Celo Sepolia</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-white/40">Metadata</span>
-                    <a
-                      href={`/api/agent-registration/${onChainAgent.agentId}`}
-                      target="_blank"
-                      className="text-blue-400 text-xs hover:underline"
-                    >
-                      View JSON
-                    </a>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-white/40">Trust</span>
-                    <span className="text-white/60 text-xs">Reputation-based</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Right column — services */}
-            <div className="lg:col-span-2">
-              <div className="p-4 rounded-xl bg-white/5 border border-white/10">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-semibold text-white">
-                    Services ({onChainAgent.services.length})
-                  </h3>
-                  <span className="text-white/20 text-xs">Escrow-protected</span>
-                </div>
-                <div className="space-y-3">
-                  {onChainAgent.services.map((svc) => (
-                    <div
-                      key={svc.serviceId}
-                      className="p-4 rounded-lg bg-black/30 border border-white/5 hover:border-green-500/20 transition group"
-                    >
-                      <div className="flex items-start justify-between mb-2">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-white font-medium text-sm group-hover:text-green-400 transition">{svc.name}</span>
-                            <span className="text-white/15 text-xs font-mono">#{svc.serviceId}</span>
-                          </div>
-                        </div>
-                        <span className="text-green-400 font-semibold text-sm whitespace-nowrap ml-3">
-                          {svc.pricePerCall} USDC
-                        </span>
-                      </div>
-                      <p className="text-white/40 text-sm leading-relaxed mb-2">{svc.description}</p>
-                      <div className="flex items-center justify-between">
-                        {svc.endpoint && (
-                          <p className="text-white/15 text-xs font-mono truncate max-w-[60%]">
-                            {svc.endpoint}
-                          </p>
-                        )}
-                        <Link
-                          href={`/chat?agent=${onChainAgent.agentId}&name=${encodeURIComponent(svc.name)}`}
-                          className="px-3 py-1 rounded-lg bg-green-500/10 text-green-400 text-xs font-medium hover:bg-green-500/20 transition ml-auto"
-                        >
-                          Hire
-                        </Link>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // ── Local agent view (registered via web) ──────────────────────────────
-  if (localAgent) {
-    const isOwner =
-      user?.wallet?.address?.toLowerCase() === localAgent.ownerAddress.toLowerCase();
-
-    return (
-      <div className="min-h-screen bg-black text-white">
-        <div className="max-w-2xl mx-auto px-4 py-8">
-          <div className="flex items-center gap-4 mb-8">
-            <div className="w-16 h-16 rounded-full bg-green-500/20 flex items-center justify-center text-green-400 font-bold text-2xl">
-              {localAgent.name.charAt(0).toUpperCase()}
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold">{localAgent.name}</h1>
               <div className="flex items-center gap-2 mt-1">
-                <code className="text-white/30 text-xs font-mono">
-                  {localAgent.agentWallet.slice(0, 6)}...{localAgent.agentWallet.slice(-4)}
+                <code className="text-white/25 text-xs font-mono">
+                  {onChainAgent.address.slice(0, 6)}...{onChainAgent.address.slice(-4)}
                 </code>
-                <button
-                  onClick={() => copyToClipboard(localAgent.agentWallet, "wallet")}
-                  className="text-white/20 hover:text-white text-xs"
-                >
-                  {copied === "wallet" ? "Copied!" : "Copy"}
+                <button onClick={() => copy(onChainAgent.address, "addr")} className="text-white/15 hover:text-white/50 text-xs">
+                  {copied === "addr" ? "Copied" : "Copy"}
                 </button>
               </div>
             </div>
           </div>
 
-          <div className="space-y-4">
-            {/* API Access */}
-            {isOwner && (
-              <div className={`p-4 rounded-xl border ${localAgent.apiKeyActive ? "bg-white/5 border-green-500/30" : "bg-white/5 border-white/10"}`}>
-                <div className="flex items-center justify-between mb-3">
-                  <h2 className="font-semibold">API Access</h2>
-                </div>
-                {localAgent.apiKeyActive ? (
-                  <>
-                    <div className="flex items-center justify-between p-3 rounded-lg bg-green-500/5 border border-green-500/20">
-                      <div>
-                        <p className="text-white text-sm font-medium">API Key Active</p>
-                        <p className="text-white/40 text-xs">For external integrations</p>
-                      </div>
-                      <button
-                        onClick={() => {
-                          updateAgent(localAgent.id, { apiKeyActive: false });
-                          setLocalAgent({ ...localAgent, apiKeyActive: false });
-                        }}
-                        className="px-3 py-1.5 rounded-lg border border-red-500/30 text-red-400 text-sm hover:bg-red-500/10 transition"
-                      >
-                        Revoke
-                      </button>
-                    </div>
-                    <div className="flex items-center gap-2 mt-3">
-                      <code className="flex-1 text-sm font-mono bg-black/50 px-3 py-2 rounded-lg text-green-400 break-all">
-                        {showKey ? localAgent.apiKey : "nst_" + "\u2022".repeat(36)}
-                      </code>
-                      <button onClick={() => setShowKey(!showKey)} className="text-white/30 hover:text-white text-xs">
-                        {showKey ? "Hide" : "Show"}
-                      </button>
-                      <button onClick={() => copyToClipboard(localAgent.apiKey, "key")} className="text-white/30 hover:text-white text-xs">
-                        {copied === "key" ? "Copied!" : "Copy"}
-                      </button>
-                    </div>
-                  </>
-                ) : (
-                  <div className="flex items-center justify-between p-3 rounded-lg bg-white/5 border border-white/10">
-                    <p className="text-white/50 text-sm">No active API key</p>
-                    <button
-                      onClick={() => {
-                        const newKey = generateApiKey();
-                        updateAgent(localAgent.id, { apiKey: newKey, apiKeyActive: true });
-                        setLocalAgent({ ...localAgent, apiKey: newKey, apiKeyActive: true });
-                      }}
-                      className="px-3 py-1.5 rounded-lg bg-green-500 text-black text-sm font-medium hover:bg-green-400 transition"
-                    >
-                      Generate New Key
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
+          {/* ── Hire CTA ── */}
+          <div className="flex gap-3 mb-8">
+            <Link
+              href={`/chat?agent=${onChainAgent.agentId}&name=${encodeURIComponent(onChainAgent.services[0]?.name || `Agent #${onChainAgent.agentId}`)}`}
+              className="flex-1 py-3 rounded-xl bg-green-500 text-black text-center font-semibold hover:bg-green-400 transition text-sm"
+            >
+              Hire this Agent
+            </Link>
+            <a
+              href={`https://sepolia.celoscan.io/address/${onChainAgent.address}`}
+              target="_blank"
+              className="px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white/50 text-center text-sm hover:bg-white/10 transition"
+            >
+              CeloScan
+            </a>
+            <a
+              href={`/api/agent-registration/${onChainAgent.agentId}`}
+              target="_blank"
+              className="px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white/50 text-center text-sm hover:bg-white/10 transition"
+            >
+              JSON
+            </a>
+          </div>
 
-            {/* Setup */}
-            {isOwner && (
-              <div className="p-4 rounded-xl bg-white/5 border border-white/10">
-                <h3 className="font-semibold text-white mb-4">Give Your Agent Access to Nastar</h3>
-                <SetupTabs apiKey={localAgent.apiKeyActive ? localAgent.apiKey : undefined} />
+          {/* ── Stats row ── */}
+          <div className="grid grid-cols-4 gap-3 mb-8">
+            {[
+              { label: "Revenue", value: `$${onChainAgent.revenue}`, accent: true },
+              { label: "Jobs", value: `${onChainAgent.jobsCompleted}/${onChainAgent.jobsTotal}` },
+              { label: "Success", value: `${onChainAgent.completionRate}%` },
+              { label: "Price", value: minPrice === maxPrice ? `$${minPrice}` : `$${minPrice}-${maxPrice}` },
+            ].map((s) => (
+              <div key={s.label} className="text-center py-3 rounded-xl bg-white/[0.03] border border-white/5">
+                <p className={`font-bold text-lg ${s.accent ? "text-green-400" : "text-white"}`}>{s.value}</p>
+                <p className="text-white/25 text-xs mt-0.5">{s.label}</p>
               </div>
-            )}
+            ))}
+          </div>
 
-            {/* Details */}
-            <div className="p-4 rounded-xl bg-white/5 border border-white/10">
-              <h3 className="font-semibold text-white mb-3">Service Details</h3>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between"><span className="text-white/40">Description</span><span className="text-white text-right max-w-[60%]">{localAgent.description}</span></div>
-                <div className="flex justify-between"><span className="text-white/40">Price</span><span className="text-green-400">{localAgent.pricePerCall} USDC</span></div>
-                <div className="flex justify-between"><span className="text-white/40">Agent NFT ID</span><span className="text-white font-mono">#{localAgent.agentNftId ?? "pending"}</span></div>
-                <div className="flex justify-between"><span className="text-white/40">Service ID</span><span className="text-white font-mono">#{localAgent.serviceId ?? "pending"}</span></div>
+          {/* ── About ── */}
+          <div className="mb-8">
+            <h2 className="text-xs text-white/25 uppercase tracking-wider mb-2">About</h2>
+            <p className="text-white/50 text-sm leading-relaxed">
+              {onChainAgent.services.map((s) => s.description).join(" ")}
+            </p>
+          </div>
+
+          {/* ── Tags ── */}
+          {tags.length > 0 && (
+            <div className="mb-8">
+              <h2 className="text-xs text-white/25 uppercase tracking-wider mb-2">Skills</h2>
+              <div className="flex flex-wrap gap-2">
+                {tags.map((tag) => (
+                  <span key={tag} className="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-white/40 text-xs">
+                    {tag}
+                  </span>
+                ))}
+                <span className="px-3 py-1 rounded-full bg-green-500/10 border border-green-500/20 text-green-400 text-xs">
+                  ERC-8004
+                </span>
+                <span className="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-white/40 text-xs">
+                  Celo
+                </span>
               </div>
             </div>
+          )}
 
-            <a href={`https://sepolia.celoscan.io/address/${localAgent.agentWallet}`} target="_blank" className="block text-center text-green-400 text-sm hover:underline">
-              View on CeloScan
-            </a>
+          {/* ── Services ── */}
+          <div className="mb-8">
+            <h2 className="text-xs text-white/25 uppercase tracking-wider mb-3">
+              Services ({onChainAgent.services.length})
+            </h2>
+            <div className="space-y-2">
+              {onChainAgent.services.map((svc) => (
+                <div
+                  key={svc.serviceId}
+                  className="flex items-center justify-between p-4 rounded-xl bg-white/[0.03] border border-white/5 hover:border-white/15 transition group"
+                >
+                  <div className="flex-1 min-w-0 mr-4">
+                    <div className="flex items-center gap-2">
+                      <span className="text-white font-medium text-sm group-hover:text-green-400 transition">{svc.name}</span>
+                      <span className="text-white/10 text-xs font-mono">#{svc.serviceId}</span>
+                    </div>
+                    <p className="text-white/30 text-xs mt-0.5 truncate">{svc.description}</p>
+                  </div>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <span className="text-green-400 font-medium text-sm">{svc.pricePerCall} USDC</span>
+                    <Link
+                      href={`/chat?agent=${onChainAgent.agentId}&name=${encodeURIComponent(svc.name)}`}
+                      className="px-3 py-1.5 rounded-lg bg-green-500/10 text-green-400 text-xs font-medium hover:bg-green-500/20 transition"
+                    >
+                      Hire
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* ── Identity details ── */}
+          <div className="mb-8">
+            <h2 className="text-xs text-white/25 uppercase tracking-wider mb-3">Identity</h2>
+            <div className="rounded-xl bg-white/[0.03] border border-white/5 divide-y divide-white/5">
+              {[
+                { label: "NFT ID", value: `#${onChainAgent.agentId} (ERC-8004)` },
+                { label: "Wallet", value: onChainAgent.address, mono: true },
+                { label: "Network", value: "Celo Sepolia (11142220)" },
+                { label: "Trust Model", value: "On-chain Reputation" },
+                { label: "Escrow", value: "0xEE51...34AF", mono: true },
+                { label: "Protocol Fee", value: "2.5% (immutable)" },
+              ].map((row) => (
+                <div key={row.label} className="flex justify-between items-center px-4 py-3">
+                  <span className="text-white/30 text-xs">{row.label}</span>
+                  <span className={`text-white/60 text-xs ${row.mono ? "font-mono" : ""}`}>{row.value}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* ── Endpoints ── */}
+          <div>
+            <h2 className="text-xs text-white/25 uppercase tracking-wider mb-3">Endpoints</h2>
+            <div className="rounded-xl bg-white/[0.03] border border-white/5 divide-y divide-white/5">
+              <div className="flex justify-between items-center px-4 py-3">
+                <span className="text-white/30 text-xs">Nastar Profile</span>
+                <span className="text-blue-400 text-xs font-mono">/agents/{onChainAgent.agentId}</span>
+              </div>
+              <div className="flex justify-between items-center px-4 py-3">
+                <span className="text-white/30 text-xs">Registration JSON</span>
+                <a href={`/api/agent-registration/${onChainAgent.agentId}`} target="_blank" className="text-blue-400 text-xs font-mono hover:underline">
+                  /api/agent-registration/{onChainAgent.agentId}
+                </a>
+              </div>
+              <div className="flex justify-between items-center px-4 py-3">
+                <span className="text-white/30 text-xs">Avatar</span>
+                <a href={`/api/agent-avatar/${onChainAgent.agentId}`} target="_blank" className="text-blue-400 text-xs font-mono hover:underline">
+                  /api/agent-avatar/{onChainAgent.agentId}
+                </a>
+              </div>
+              {onChainAgent.services[0]?.endpoint && (
+                <div className="flex justify-between items-center px-4 py-3">
+                  <span className="text-white/30 text-xs">API</span>
+                  <span className="text-white/40 text-xs font-mono truncate max-w-[60%]">{onChainAgent.services[0].endpoint}</span>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
     );
   }
 
-  // ── Not found ──────────────────────────────────────────────────────────
+  // ── Local agent ────────────────────────────────────────────────────────
+  if (localAgent) {
+    const isOwner = user?.wallet?.address?.toLowerCase() === localAgent.ownerAddress.toLowerCase();
+    return (
+      <div className="min-h-screen bg-black text-white">
+        <div className="max-w-3xl mx-auto px-4 py-8 md:py-12">
+          <div className="flex items-start gap-4 mb-6">
+            <div className="w-14 h-14 rounded-xl bg-green-500/15 border border-green-500/20 flex items-center justify-center text-green-400 font-bold text-xl shrink-0">
+              {localAgent.name.charAt(0).toUpperCase()}
+            </div>
+            <div>
+              <h1 className="text-xl font-bold">{localAgent.name}</h1>
+              <code className="text-white/25 text-xs font-mono">
+                {localAgent.agentWallet.slice(0, 6)}...{localAgent.agentWallet.slice(-4)}
+              </code>
+            </div>
+          </div>
+
+          {/* Hire */}
+          <Link
+            href="/chat"
+            className="block w-full py-3 rounded-xl bg-green-500 text-black text-center font-semibold hover:bg-green-400 transition text-sm mb-8"
+          >
+            Hire this Agent
+          </Link>
+
+          {/* API Key (owner only) */}
+          {isOwner && (
+            <div className="mb-8">
+              <h2 className="text-xs text-white/25 uppercase tracking-wider mb-3">API Access</h2>
+              {localAgent.apiKeyActive ? (
+                <div className="p-4 rounded-xl bg-white/[0.03] border border-green-500/20">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-green-400 text-sm font-medium">Active</span>
+                    <button
+                      onClick={() => { updateAgent(localAgent.id, { apiKeyActive: false }); setLocalAgent({ ...localAgent, apiKeyActive: false }); }}
+                      className="text-red-400/60 text-xs hover:text-red-400"
+                    >
+                      Revoke
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <code className="flex-1 text-xs font-mono bg-black/50 px-3 py-2 rounded-lg text-green-400 break-all">
+                      {showKey ? localAgent.apiKey : "nst_" + "\u2022".repeat(36)}
+                    </code>
+                    <button onClick={() => setShowKey(!showKey)} className="text-white/20 text-xs">{showKey ? "Hide" : "Show"}</button>
+                    <button onClick={() => copy(localAgent.apiKey, "key")} className="text-white/20 text-xs">{copied === "key" ? "Done" : "Copy"}</button>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-4 rounded-xl bg-white/[0.03] border border-white/10 flex items-center justify-between">
+                  <span className="text-white/30 text-sm">No active key</span>
+                  <button
+                    onClick={() => { const k = generateApiKey(); updateAgent(localAgent.id, { apiKey: k, apiKeyActive: true }); setLocalAgent({ ...localAgent, apiKey: k, apiKeyActive: true }); }}
+                    className="px-3 py-1.5 rounded-lg bg-green-500 text-black text-xs font-medium"
+                  >
+                    Generate
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Setup */}
+          {isOwner && (
+            <div className="mb-8">
+              <h2 className="text-xs text-white/25 uppercase tracking-wider mb-3">Setup</h2>
+              <div className="p-4 rounded-xl bg-white/[0.03] border border-white/10">
+                <SetupTabs apiKey={localAgent.apiKeyActive ? localAgent.apiKey : undefined} />
+              </div>
+            </div>
+          )}
+
+          {/* Details */}
+          <div>
+            <h2 className="text-xs text-white/25 uppercase tracking-wider mb-3">Details</h2>
+            <div className="rounded-xl bg-white/[0.03] border border-white/5 divide-y divide-white/5">
+              {[
+                { label: "Description", value: localAgent.description },
+                { label: "Price", value: `${localAgent.pricePerCall} USDC` },
+                { label: "NFT ID", value: `#${localAgent.agentNftId ?? "pending"}` },
+                { label: "Service ID", value: `#${localAgent.serviceId ?? "pending"}` },
+              ].map((row) => (
+                <div key={row.label} className="flex justify-between items-center px-4 py-3">
+                  <span className="text-white/30 text-xs">{row.label}</span>
+                  <span className="text-white/60 text-xs text-right max-w-[60%]">{row.value}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-black flex items-center justify-center text-white/40">
+    <div className="min-h-screen bg-black flex items-center justify-center text-white/30 text-sm">
       Agent not found.{" "}
-      <Link href="/agents" className="text-green-400 ml-2 hover:underline">
-        Back to Explorer
-      </Link>
+      <Link href="/agents" className="text-green-400 ml-2 hover:underline">Back to Explorer</Link>
     </div>
   );
 }
