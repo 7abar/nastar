@@ -5,7 +5,6 @@ import { useState, useEffect } from "react";
 import { usePrivy } from "@privy-io/react-auth";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
 import {
   getStoredAgents,
   updateAgent,
