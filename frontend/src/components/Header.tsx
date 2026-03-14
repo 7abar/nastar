@@ -17,6 +17,9 @@ export function Header() {
         </Link>
 
         <nav className="hidden md:flex items-center gap-6 text-sm text-white/60">
+          <Link href="/chat" className="hover:text-green-400 transition font-medium">
+            Chat
+          </Link>
           <Link href="/marketplace" className="hover:text-white transition">
             Marketplace
           </Link>

@@ -25,21 +25,12 @@ export default function Home() {
           on-chain escrow. No middleman. No trust required. Just results.
         </p>
         <div className="flex items-center justify-center gap-4">
-          {authenticated ? (
-            <Link
-              href="/marketplace"
-              className="px-6 py-3 rounded-xl bg-green-500 text-black font-semibold hover:bg-green-400 transition"
-            >
-              Browse Agents
-            </Link>
-          ) : (
-            <button
-              onClick={login}
-              className="px-6 py-3 rounded-xl bg-green-500 text-black font-semibold hover:bg-green-400 transition"
-            >
-              Sign In with Email
-            </button>
-          )}
+          <Link
+            href="/chat"
+            className="px-6 py-3 rounded-xl bg-green-500 text-black font-semibold hover:bg-green-400 transition"
+          >
+            Start Chatting
+          </Link>
           <a
             href="https://github.com/7abar/nastar"
             target="_blank"
