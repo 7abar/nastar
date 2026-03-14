@@ -1,29 +1,35 @@
 "use client";
+export const dynamic = "force-dynamic";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
 import { usePrivy, useWallets } from "@privy-io/react-auth";
 import { createPublicClient, http, formatUnits } from "viem";
 import Link from "next/link";
-import { celoSepoliaCustom, CONTRACTS, ESCROW_ABI, ERC8004_ABI } from "@/lib/contracts";
+import { useSearchParams, useRouter } from "next/navigation";
+import { celoSepoliaCustom, CONTRACTS, ESCROW_ABI } from "@/lib/contracts";
 import { getStoredAgents, type RegisteredAgent } from "@/lib/agents-api";
 
 const client = createPublicClient({ chain: celoSepoliaCustom, transport: http() });
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://api-production-a473.up.railway.app";
+const TELEGRAM_BOT_USERNAME = process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME || "NastarBot";
 
 const DEAL_STATUS: Record<number, string> = { 0: "Created", 1: "Accepted", 2: "Delivered", 3: "Completed", 4: "Disputed", 5: "Refunded", 6: "Expired", 7: "Resolved" };
 
-interface SocialLink {
+interface SocialProfile {
   platform: string;
-  icon: string;
   username: string;
-  connected: boolean;
-  color: string;
-  authUrl: string;
+  displayName: string;
+  avatar: string;
+  url: string;
+  bio?: string;
+  followers?: number;
+  repos?: number;
+  telegramId?: number;
 }
 
 interface UserProfile {
   bio: string;
-  socials: Record<string, string>;
+  socials: Record<string, SocialProfile>;
 }
 
 function loadProfile(addr: string): UserProfile {
@@ -37,14 +43,24 @@ function saveProfile(addr: string, p: UserProfile) {
   localStorage.setItem(`nastar-profile-${addr.toLowerCase()}`, JSON.stringify(p));
 }
 
-export default function SettingsPage() {
+export default function SettingsPageWrapper() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#0A0A0A]" />}>
+      <SettingsPage />
+    </Suspense>
+  );
+}
+
+function SettingsPage() {
   const { authenticated, login, logout, user } = usePrivy();
   const { wallets } = useWallets();
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const [tab, setTab] = useState<"profile" | "agents" | "deals" | "wallets">("profile");
   const [profile, setProfile] = useState<UserProfile>({ bio: "", socials: {} });
   const [saved, setSaved] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [connecting, setConnecting] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   // Deals
   const [deals, setDeals] = useState<any[]>([]);
@@ -62,7 +78,75 @@ export default function SettingsPage() {
     if (address) setProfile(loadProfile(address));
   }, [address]);
 
-  // Load deals when tab switches
+  // Handle OAuth callback from URL params
+  useEffect(() => {
+    const socialParam = searchParams.get("social");
+    const errorParam = searchParams.get("error");
+
+    if (errorParam) {
+      setError(`Connection failed: ${errorParam.replace(/_/g, " ")}`);
+      router.replace("/settings", { scroll: false });
+      setTimeout(() => setError(null), 5000);
+      return;
+    }
+
+    if (socialParam && address) {
+      try {
+        const socialData: SocialProfile = JSON.parse(decodeURIComponent(socialParam));
+        const newProfile = {
+          ...loadProfile(address),
+          socials: { ...loadProfile(address).socials, [socialData.platform]: socialData },
+        };
+        saveProfile(address, newProfile);
+        setProfile(newProfile);
+        router.replace("/settings", { scroll: false });
+      } catch (err) {
+        console.error("Failed to parse social data:", err);
+      }
+    }
+  }, [searchParams, address, router]);
+
+  // Telegram Login Widget
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    (window as any).onTelegramAuth = async (tgUser: any) => {
+      try {
+        const res = await fetch("/api/auth/telegram", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(tgUser),
+        });
+        if (!res.ok) throw new Error("Verification failed");
+        const socialData: SocialProfile = await res.json();
+        if (address) {
+          const newProfile = {
+            ...loadProfile(address),
+            socials: { ...loadProfile(address).socials, Telegram: socialData },
+          };
+          saveProfile(address, newProfile);
+          setProfile(newProfile);
+        }
+      } catch (err) {
+        setError("Telegram verification failed");
+        setTimeout(() => setError(null), 5000);
+      }
+    };
+  }, [address]);
+
+  // Load Telegram widget script
+  const telegramWidgetRef = useCallback((node: HTMLDivElement | null) => {
+    if (!node) return;
+    node.innerHTML = "";
+    const script = document.createElement("script");
+    script.src = "https://telegram.org/js/telegram-widget.js?22";
+    script.setAttribute("data-telegram-login", TELEGRAM_BOT_USERNAME);
+    script.setAttribute("data-size", "medium");
+    script.setAttribute("data-onauth", "onTelegramAuth(user)");
+    script.setAttribute("data-request-access", "write");
+    script.async = true;
+    node.appendChild(script);
+  }, []);
+
   useEffect(() => {
     if (tab === "deals" && address && deals.length === 0) loadDeals();
     if (tab === "agents" && address) loadAgents();
@@ -102,47 +186,6 @@ export default function SettingsPage() {
     setTimeout(() => setSaved(false), 2000);
   }
 
-  function handleConnect(platform: string) {
-    setConnecting(platform);
-    // Simulate OAuth popup — in production would redirect to real OAuth
-    const popup = window.open("", "_blank", "width=500,height=600");
-    if (popup) {
-      popup.document.write(`
-        <html><head><title>Connect ${platform}</title>
-        <style>body{background:#0A0A0A;color:#F5F5F5;font-family:system-ui;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0}
-        .card{text-align:center;padding:40px;border-radius:16px;border:1px solid rgba(244,196,48,0.2);background:#1A1A1A;max-width:360px}
-        h2{margin:0 0 8px}p{color:#A1A1A1;font-size:14px;margin:0 0 24px}
-        input{width:100%;padding:12px;border-radius:8px;border:1px solid #333;background:#111;color:#F5F5F5;font-size:14px;margin-bottom:12px;box-sizing:border-box}
-        button{width:100%;padding:12px;border-radius:8px;border:none;background:linear-gradient(90deg,#F4C430,#FF9F1C);color:#0A0A0A;font-weight:bold;font-size:14px;cursor:pointer}
-        button:hover{opacity:0.9}.icon{font-size:40px;margin-bottom:16px}</style></head>
-        <body><div class="card">
-        <div class="icon">${platform === "GitHub" ? "🐙" : platform === "Twitter" ? "🐦" : platform === "Telegram" ? "✈️" : "🌐"}</div>
-        <h2>Connect ${platform}</h2>
-        <p>Enter your ${platform} username to link it to your Nastar profile.</p>
-        <input id="u" placeholder="@username" autofocus />
-        <button onclick="window.opener.postMessage({platform:'${platform}',username:document.getElementById('u').value},'*');window.close()">Connect</button>
-        </div></body></html>
-      `);
-    }
-  }
-
-  // Listen for OAuth callback
-  useEffect(() => {
-    function handler(e: MessageEvent) {
-      if (e.data?.platform && e.data?.username) {
-        const username = e.data.username.replace(/^@/, "").trim();
-        if (username) {
-          const newProfile = { ...profile, socials: { ...profile.socials, [e.data.platform]: username } };
-          setProfile(newProfile);
-          if (address) saveProfile(address, newProfile);
-        }
-        setConnecting(null);
-      }
-    }
-    window.addEventListener("message", handler);
-    return () => window.removeEventListener("message", handler);
-  }, [profile, address]);
-
   function handleDisconnect(platform: string) {
     const newSocials = { ...profile.socials };
     delete newSocials[platform];
@@ -151,10 +194,10 @@ export default function SettingsPage() {
     if (address) saveProfile(address, newProfile);
   }
 
-  const socialPlatforms: SocialLink[] = [
-    { platform: "GitHub", icon: "G", username: profile.socials.GitHub || "", connected: !!profile.socials.GitHub, color: "#333", authUrl: "https://github.com" },
-    { platform: "Twitter", icon: "X", username: profile.socials.Twitter || "", connected: !!profile.socials.Twitter, color: "#1DA1F2", authUrl: "https://twitter.com" },
-    { platform: "Telegram", icon: "T", username: profile.socials.Telegram || "", connected: !!profile.socials.Telegram, color: "#229ED9", authUrl: "https://t.me" },
+  const platforms = [
+    { key: "GitHub", authUrl: "/api/auth/github", type: "oauth" as const },
+    { key: "Twitter", authUrl: "/api/auth/twitter", type: "oauth" as const },
+    { key: "Telegram", authUrl: "", type: "widget" as const },
   ];
 
   if (!authenticated) {
@@ -174,6 +217,13 @@ export default function SettingsPage() {
   return (
     <div className="min-h-screen bg-[#0A0A0A] text-[#F5F5F5]">
       <div className="max-w-2xl mx-auto px-4 py-8 md:py-12">
+        {/* Error banner */}
+        {error && (
+          <div className="mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+            {error}
+          </div>
+        )}
+
         {/* Header */}
         <div className="flex items-center gap-4 mb-8">
           <div className="w-14 h-14 rounded-full bg-[#F4C430] text-[#0A0A0A] text-xl font-bold flex items-center justify-center">
@@ -210,7 +260,7 @@ export default function SettingsPage() {
           ))}
         </div>
 
-        {/* ═══ PROFILE TAB ═══ */}
+        {/* PROFILE TAB */}
         {tab === "profile" && (
           <div className="space-y-8">
             {/* Bio */}
@@ -228,50 +278,70 @@ export default function SettingsPage() {
               </button>
             </div>
 
-            {/* Social connections */}
+            {/* Connected accounts */}
             <div>
               <h3 className="text-sm font-medium text-[#F5F5F5] mb-4">Connected Accounts</h3>
               <div className="space-y-3">
-                {socialPlatforms.map((s) => (
-                  <div key={s.platform} className="flex items-center justify-between p-4 rounded-xl bg-white/[0.03] border border-white/[0.08]">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-white/[0.06] flex items-center justify-center shrink-0">
-                        {s.platform === "GitHub" ? (
-                          <svg className="w-5 h-5 text-[#F5F5F5]" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/></svg>
-                        ) : s.platform === "Twitter" ? (
-                          <svg className="w-5 h-5 text-[#F5F5F5]" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
-                        ) : (
-                          <svg className="w-5 h-5 text-[#F5F5F5]" viewBox="0 0 24 24" fill="currentColor"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>
-                        )}
+                {platforms.map((p) => {
+                  const connected = profile.socials[p.key];
+                  return (
+                    <div key={p.key} className="flex items-center justify-between p-4 rounded-xl bg-white/[0.03] border border-white/[0.08]">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-white/[0.06] flex items-center justify-center shrink-0 overflow-hidden">
+                          {connected?.avatar ? (
+                            <img src={connected.avatar} alt="" className="w-10 h-10 rounded-xl object-cover" />
+                          ) : p.key === "GitHub" ? (
+                            <svg className="w-5 h-5 text-[#F5F5F5]" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/></svg>
+                          ) : p.key === "Twitter" ? (
+                            <svg className="w-5 h-5 text-[#F5F5F5]" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+                          ) : (
+                            <svg className="w-5 h-5 text-[#F5F5F5]" viewBox="0 0 24 24" fill="currentColor"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>
+                          )}
+                        </div>
+                        <div>
+                          <p className="text-[#F5F5F5] text-sm font-medium">{p.key}</p>
+                          {connected ? (
+                            <div className="flex items-center gap-2">
+                              <a href={connected.url} target="_blank" className="text-[#F4C430] text-xs hover:underline">
+                                @{connected.username}
+                              </a>
+                              {connected.followers !== undefined && (
+                                <span className="text-[#A1A1A1]/30 text-[10px]">{connected.followers} followers</span>
+                              )}
+                            </div>
+                          ) : (
+                            <p className="text-[#A1A1A1]/40 text-xs">Not connected</p>
+                          )}
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-[#F5F5F5] text-sm font-medium">{s.platform}</p>
-                        {s.connected ? (
-                          <p className="text-[#F4C430] text-xs">@{s.username}</p>
-                        ) : (
-                          <p className="text-[#A1A1A1]/40 text-xs">Not connected</p>
-                        )}
-                      </div>
+
+                      {connected ? (
+                        <button
+                          onClick={() => handleDisconnect(p.key)}
+                          className="px-4 py-2 rounded-lg border border-white/[0.08] text-[#A1A1A1] text-xs hover:text-red-400 hover:border-red-400/30 transition"
+                        >
+                          Disconnect
+                        </button>
+                      ) : p.type === "oauth" ? (
+                        <a
+                          href={p.authUrl}
+                          className="px-4 py-2 rounded-lg bg-[#F4C430] text-[#0A0A0A] text-xs font-bold hover:shadow-[0_0_10px_rgba(244,196,48,0.3)] transition inline-flex items-center gap-1.5"
+                        >
+                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                          </svg>
+                          Connect
+                        </a>
+                      ) : (
+                        <div ref={telegramWidgetRef} className="telegram-login-widget" />
+                      )}
                     </div>
-                    {s.connected ? (
-                      <button
-                        onClick={() => handleDisconnect(s.platform)}
-                        className="px-4 py-2 rounded-lg border border-white/[0.08] text-[#A1A1A1] text-xs hover:text-red-400 hover:border-red-400/30 transition"
-                      >
-                        Disconnect
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => handleConnect(s.platform)}
-                        disabled={connecting === s.platform}
-                        className="px-4 py-2 rounded-lg bg-[#F4C430] text-[#0A0A0A] text-xs font-bold hover:shadow-[0_0_10px_rgba(244,196,48,0.3)] disabled:opacity-50 transition"
-                      >
-                        {connecting === s.platform ? "Connecting..." : "Connect"}
-                      </button>
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
+              <p className="text-[#A1A1A1]/30 text-[10px] mt-3">
+                Read-only access. We never post or modify anything on your accounts.
+              </p>
             </div>
 
             {/* Danger */}
@@ -283,7 +353,7 @@ export default function SettingsPage() {
           </div>
         )}
 
-        {/* ═══ MY AGENTS TAB ═══ */}
+        {/* MY AGENTS TAB */}
         {tab === "agents" && (
           <div className="space-y-4">
             <div className="flex items-center justify-between mb-2">
@@ -340,7 +410,7 @@ export default function SettingsPage() {
           </div>
         )}
 
-        {/* ═══ MY DEALS TAB ═══ */}
+        {/* MY DEALS TAB */}
         {tab === "deals" && (
           <div className="space-y-3">
             <div className="flex items-center justify-between mb-2">
@@ -397,7 +467,7 @@ export default function SettingsPage() {
           </div>
         )}
 
-        {/* ═══ WALLETS TAB ═══ */}
+        {/* WALLETS TAB */}
         {tab === "wallets" && (
           <div className="space-y-4">
             <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.08]">
