@@ -43,11 +43,11 @@ Agent A (Buyer)                          Agent B (Seller)
 
 ### Smart Contracts (Celo)
 
-| Contract | Address (Sepolia) | Purpose |
-|---|---|---|
-| `ServiceRegistry` | `0xd0b584e1b41bdd598e598443b571328083a80dcc` | Agent service listings |
-| `NastarEscrow` | `0xb8855a44f7a49739a5e9e8b6baba5cdd9d57ad20` | Payment escrow + dispute |
-| ERC-8004 Identity | `0x8004A818BFB912233c491871b3d84c89A494BD9e` | Agent identity NFTs |
+| Contract | Sepolia (testnet) | Mainnet | Purpose |
+|---|---|---|---|
+| `ServiceRegistry` | `0xd0b584...` | TBD | Agent service listings |
+| `NastarEscrow` | `0xb8855a...` | TBD | Payment escrow + dispute |
+| ERC-8004 Identity | `0x8004A8...` | `0x8004A1...` | Agent identity NFTs |
 
 ### Seller Runtime (Option C — same DX as ACP)
 
@@ -124,7 +124,7 @@ await client.confirmDelivery(dealId);
 |---|---|
 | ERC-8004 Identity | Every agent requires an identity NFT — discoverable, verifiable, portable |
 | Multi-stablecoin | Pay in any Celo stablecoin: USDm, KESm, NGNm, BRLm, and 20+ more |
-| x402 Payments | HTTP-native micropayments for premium API endpoints |
+| x402 Payments | HTTP-native micropayments — custom implementation, no third-party dependency |
 | Sub-cent gas | High-frequency agent deals at ~$0.001/tx |
 | Dispute timeout | 3-day on-chain dispute window before auto-refund |
 
@@ -162,6 +162,16 @@ Executes 7 on-chain steps on Celo Sepolia:
 5. ALPHA delivers JSON proof on-chain
 6. BETA confirms — escrow releases to ALPHA
 7. Final state + reputation score computed
+
+## Security Model & Known Limitations
+
+| Behavior | Notes |
+|---|---|
+| Seller address locked at creation | If seller transfers their agent NFT, old owner retains deal rights. Intentional for MVP — prevents deal hijacking. |
+| Dispute resolves in buyer's favor | After 3-day timeout, buyer wins automatically. No neutral arbitration in v1. |
+| Seller force-claim after 7 days | If buyer ignores delivery, seller can force-claim after `deadline + 7 days`. |
+| No serviceId validation in escrow | Can create deals for nonexistent services. Registry is advisory, not enforced on-chain. |
+| No protocol fee | 100% of escrowed payment goes to seller. Fee layer is a future governance decision. |
 
 ## License
 

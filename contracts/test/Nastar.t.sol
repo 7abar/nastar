@@ -320,6 +320,68 @@ contract NastarTest is Test {
         escrow.acceptDeal(dealId);
     }
 
+    function test_deliverAfterDeadline_reverts() public {
+        uint256 serviceId = _createTestService();
+        uint256 dealId = _createTestDeal(serviceId);
+
+        vm.prank(bob);
+        escrow.acceptDeal(dealId);
+
+        // Deadline passes
+        vm.warp(block.timestamp + 8 days);
+
+        // Bob tries to deliver after deadline — must revert
+        vm.prank(bob);
+        vm.expectRevert(NastarEscrow.DealExpiredError.selector);
+        escrow.deliverDeal(dealId, "ipfs://LateFiling");
+    }
+
+    function test_sellerClaimAfterBuyerTimeout() public {
+        uint256 serviceId = _createTestService();
+        uint256 dealId = _createTestDeal(serviceId);
+
+        // Bob accepts and delivers on time
+        vm.prank(bob);
+        escrow.acceptDeal(dealId);
+        vm.prank(bob);
+        escrow.deliverDeal(dealId, "ipfs://QmDelivered");
+
+        // Alice goes unresponsive — wait past deadline + DELIVERY_TIMEOUT
+        vm.warp(block.timestamp + 7 days + escrow.DELIVERY_TIMEOUT() + 1);
+
+        // Bob claims payment
+        vm.prank(bob);
+        escrow.sellerClaimAfterTimeout(dealId);
+        assertEq(uint8(escrow.getDeal(dealId).status), uint8(NastarEscrow.DealStatus.Completed));
+        assertEq(usdc.balanceOf(bob), 10e6);
+        assertEq(usdc.balanceOf(address(escrow)), 0);
+    }
+
+    function test_sellerClaimTooEarly_reverts() public {
+        uint256 serviceId = _createTestService();
+        uint256 dealId = _createTestDeal(serviceId);
+
+        vm.prank(bob);
+        escrow.acceptDeal(dealId);
+        vm.prank(bob);
+        escrow.deliverDeal(dealId, "ipfs://QmDelivered");
+
+        // Bob tries to claim immediately — must fail
+        vm.prank(bob);
+        vm.expectRevert();
+        escrow.sellerClaimAfterTimeout(dealId);
+    }
+
+    function test_tooManyTags_reverts() public {
+        vm.startPrank(bob);
+        bytes32[] memory tags = new bytes32[](11); // > MAX_TAGS = 10
+        for (uint256 i = 0; i < 11; i++) tags[i] = bytes32(i);
+
+        vm.expectRevert(ServiceRegistry.TooManyTags.selector);
+        registry.registerService(bobAgentId, "Test", "Desc", "http://test", address(usdc), 1e6, tags);
+        vm.stopPrank();
+    }
+
     function test_getBuyerAndSellerDeals() public {
         uint256 serviceId = _createTestService();
         _createTestDeal(serviceId);

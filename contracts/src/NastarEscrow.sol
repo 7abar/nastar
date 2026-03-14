@@ -103,6 +103,9 @@ contract NastarEscrow {
     /// @notice Maximum allowed deal deadline from creation.
     uint256 public constant MAX_DEADLINE = 30 days;
 
+    /// @notice Seller can force-claim payment if buyer is unresponsive this long after delivery.
+    uint256 public constant DELIVERY_TIMEOUT = 7 days;
+
     // ──────────────────────────────────────────────
     // Events
     // ──────────────────────────────────────────────
@@ -132,12 +135,14 @@ contract NastarEscrow {
     error NotBuyer();
     error NotSeller();
     error InvalidStatus(DealStatus expected, DealStatus actual);
+    error NotRefundable();
     error DeadlineTooLong();
     error DealExpiredError();
     error TransferFailed();
     error ZeroAmount();
     error ZeroAddress();
     error DisputeTimeoutNotReached(uint256 canRefundAt, uint256 now_);
+    error DeliveryTimeoutNotReached(uint256 canClaimAt, uint256 now_);
     error SelfDeal();
 
     // ──────────────────────────────────────────────
@@ -232,12 +237,14 @@ contract NastarEscrow {
 
     /**
      * @notice Seller marks deal as delivered with proof of work.
+     *         Must be called before the deadline — late delivery is not allowed.
      * @param proof IPFS hash, URL, or any string identifying the deliverable.
      */
     function deliverDeal(uint256 dealId, string calldata proof) external {
         Deal storage deal = deals[dealId];
         _requireStatus(deal, DealStatus.Accepted);
         if (deal.seller != msg.sender) revert NotSeller();
+        if (block.timestamp > deal.deadline) revert DealExpiredError();
 
         deal.deliveryProof = proof;
         deal.status = DealStatus.Delivered;
@@ -313,7 +320,7 @@ contract NastarEscrow {
             deal.status = DealStatus.Refunded;
         }
 
-        if (!canRefund) revert InvalidStatus(DealStatus.Disputed, status);
+        if (!canRefund) revert NotRefundable();
 
         // CEI: state updated above, now transfer
         address buyer = deal.buyer;
@@ -323,6 +330,38 @@ contract NastarEscrow {
         emit DealRefunded(dealId, amount);
 
         bool success = IERC20(token).transfer(buyer, amount);
+        if (!success) revert TransferFailed();
+    }
+
+    /**
+     * @notice Seller can claim payment if buyer has not acted for DELIVERY_TIMEOUT
+     *         after delivery. Protects seller from buyer going unresponsive.
+     *
+     *         Timeline: deliverDeal() → wait 7 days → sellerClaimAfterTimeout()
+     *
+     * @dev Buyer still has DELIVERY_TIMEOUT to confirm or dispute.
+     *      After that window, seller wins by default.
+     */
+    function sellerClaimAfterTimeout(uint256 dealId) external {
+        Deal storage deal = deals[dealId];
+        _requireStatus(deal, DealStatus.Delivered);
+        if (deal.seller != msg.sender) revert NotSeller();
+
+        uint256 canClaimAt = deal.deadline + DELIVERY_TIMEOUT;
+        if (block.timestamp < canClaimAt) {
+            revert DeliveryTimeoutNotReached(canClaimAt, block.timestamp);
+        }
+
+        // CEI: update state before transfer
+        deal.status = DealStatus.Completed;
+        deal.completedAt = block.timestamp;
+        address seller = deal.seller;
+        address token = deal.paymentToken;
+        uint256 amount = deal.amount;
+
+        emit DealCompleted(dealId, amount);
+
+        bool success = IERC20(token).transfer(seller, amount);
         if (!success) revert TransferFailed();
     }
 

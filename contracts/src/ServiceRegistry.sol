@@ -92,9 +92,10 @@ contract ServiceRegistry {
     // ──────────────────────────────────────────────
 
     error NotAgentOwner();
-    error ServiceNotFound();
     error NotServiceProvider();
     error EmptyName();
+    error ZeroAddress();
+    error TooManyTags();
 
     // ──────────────────────────────────────────────
     // Modifiers
@@ -114,7 +115,11 @@ contract ServiceRegistry {
     // Constructor
     // ──────────────────────────────────────────────
 
+    /// @dev Maximum tags per service registration. Prevents storage DoS.
+    uint256 public constant MAX_TAGS = 10;
+
     constructor(address _identityRegistry) {
+        if (_identityRegistry == address(0)) revert ZeroAddress();
         identityRegistry = IERC721(_identityRegistry);
     }
 
@@ -135,6 +140,7 @@ contract ServiceRegistry {
         bytes32[] calldata tags
     ) external onlyAgentOwner(agentId) returns (uint256 serviceId) {
         if (bytes(name).length == 0) revert EmptyName();
+        if (tags.length > MAX_TAGS) revert TooManyTags();
 
         serviceId = nextServiceId++;
 
