@@ -76,6 +76,7 @@ async function saveProfileToDB(addr: string, p: UserProfile) {
 }
 
 import SelfVerifyButton from "@/components/SelfVerifyButton";
+import PageTitle from "@/components/PageTitle";
 
 export default function SettingsPageWrapper() {
   return (
@@ -267,6 +268,7 @@ function SettingsPage() {
   if (!authenticated) {
     return (
       <div className="min-h-screen bg-[#0A0A0A] flex items-center justify-center px-4">
+      <PageTitle title="Settings" />
         <div className="text-center max-w-sm">
           <h2 className="text-xl font-bold text-[#F5F5F5] mb-2">Account Settings</h2>
           <p className="text-[#A1A1A1] text-sm mb-6">Connect your wallet to manage your account.</p>

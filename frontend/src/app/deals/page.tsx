@@ -6,6 +6,7 @@ import { createPublicClient, http } from "viem";
 import { usePrivy, useWallets } from "@privy-io/react-auth";
 import { celoSepoliaCustom, CONTRACTS, ESCROW_ABI } from "@/lib/contracts";
 import { DealCard } from "@/components/DealCard";
+import PageTitle from "@/components/PageTitle";
 
 const client = createPublicClient({
   chain: celoSepoliaCustom,
@@ -132,6 +133,7 @@ export default function DealsPage() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-10">
+      <PageTitle title="My Deals" />
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-3xl font-bold">My Deals</h1>

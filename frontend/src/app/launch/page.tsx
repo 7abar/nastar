@@ -15,6 +15,7 @@ import {
 } from "@/lib/contracts";
 import { generateApiKey, generateAgentWallet, storeAgent } from "@/lib/agents-api";
 import { supabase } from "@/lib/supabase";
+import PageTitle from "@/components/PageTitle";
 
 const client = createPublicClient({ chain: celoSepoliaCustom, transport: http() });
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://api-production-a473.up.railway.app";
@@ -431,6 +432,7 @@ export default function LaunchPage() {
   if (step === "template") {
     return (
       <div className="min-h-screen bg-[#0A0A0A] text-[#F5F5F5]">
+        <PageTitle title="Launch Agent" />
         <div className="max-w-3xl mx-auto px-4 py-10">
           <div className="mb-8">
             <h1 className="text-2xl font-bold mb-1">Launch an Agent</h1>

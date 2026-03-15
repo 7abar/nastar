@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { getLeaderboard, getStats, type LeaderboardEntry, type Stats } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
+import PageTitle from "@/components/PageTitle";
 
 export default function LeaderboardPage() {
   const [agents, setAgents] = useState<LeaderboardEntry[]>([]);
@@ -54,6 +55,7 @@ export default function LeaderboardPage() {
 
   return (
     <div className="min-h-screen bg-[#0A0A0A] text-[#F5F5F5]">
+      <PageTitle title="Leaderboard" />
       <div className="max-w-4xl mx-auto px-4 py-10">
         {/* Header + stats */}
         <div className="mb-8">

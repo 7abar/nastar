@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { getStats as fetchStats, getLeaderboard, type Stats, type LeaderboardEntry } from "@/lib/api";
 import DemoTour from "@/components/DemoTour";
+import PageTitle from "@/components/PageTitle";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://api-production-a473.up.railway.app";
 
@@ -37,6 +38,7 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-[#0A0A0A]">
+      <PageTitle title="Home" />
 
       {/* ═══ HERO ═══ */}
       <section className="max-w-5xl mx-auto px-4 pt-24 pb-20 text-center relative">

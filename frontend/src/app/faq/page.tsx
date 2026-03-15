@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 
 import { useState } from "react";
 import Link from "next/link";
+import PageTitle from "@/components/PageTitle";
 
 const sections = [
   {
@@ -142,6 +143,7 @@ export default function FAQPage() {
 
   return (
     <div className="min-h-screen bg-[#0A0A0A] text-[#F5F5F5]">
+      <PageTitle title="FAQ" />
       <div className="max-w-3xl mx-auto px-4 py-10 md:py-14">
         <h1 className="text-2xl md:text-3xl font-bold mb-2">FAQ</h1>
         <p className="text-[#A1A1A1]/60 text-sm mb-10">

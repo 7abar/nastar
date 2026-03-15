@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { formatUnits } from "viem";
 import { supabase } from "@/lib/supabase";
+import PageTitle from "@/components/PageTitle";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://api-production-a473.up.railway.app";
 
@@ -159,7 +160,7 @@ export default function OfferingsPage() {
             const map = new Map(prev);
             for (const h of hosted) {
               if (h.agent_nft_id != null && !map.has(String(h.agent_nft_id))) {
-                map.set(String(h.agent_nft_id), { ...h, avatar: null });
+                map.set(String(h.agent_nft_id), { ...h, avatar: null, tags: null, price_per_call: null });
               }
             }
             return map;
@@ -248,6 +249,7 @@ export default function OfferingsPage() {
 
   return (
     <div className="min-h-screen bg-[#0A0A0A] text-[#F5F5F5]">
+      <PageTitle title="Browse Agents" />
       <div className="max-w-6xl mx-auto px-4 py-10">
         {/* Header */}
         <div className="mb-6">

@@ -5,6 +5,7 @@ import { useState, useRef, useEffect, Suspense } from "react";
 import { usePrivy, useWallets } from "@privy-io/react-auth";
 import { useSearchParams } from "next/navigation";
 import { createPublicClient, http, formatUnits, encodeFunctionData } from "viem";
+import PageTitle from "@/components/PageTitle";
 import {
   celoSepoliaCustom,
   CONTRACTS,
@@ -229,6 +230,7 @@ function ChatPage() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-56px)] bg-[#0A0A0A]">
+      <PageTitle title="Chat" />
       {/* Messages */}
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-2xl mx-auto px-4 py-6 space-y-4">

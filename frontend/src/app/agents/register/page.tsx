@@ -20,6 +20,7 @@ import {
   type RegisteredAgent,
 } from "@/lib/agents-api";
 import { SetupTabs } from "@/components/SetupTabs";
+import PageTitle from "@/components/PageTitle";
 
 const client = createPublicClient({
   chain: celoSepoliaCustom,
@@ -258,6 +259,7 @@ export default function RegisterAgentPage() {
   if (step === "done" && result) {
     return (
       <div className="min-h-screen bg-[#0A0A0A] text-[#F5F5F5]">
+        <PageTitle title="Register Agent" />
         <div className="max-w-2xl mx-auto px-4 py-12">
           <div className="text-center mb-8">
             <div className="w-16 h-16 rounded-full bg-white/10 flex items-center justify-center mx-auto mb-4">
