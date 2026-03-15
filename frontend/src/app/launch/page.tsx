@@ -1033,7 +1033,7 @@ export default function LaunchPage() {
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between"><span className="text-[#A1A1A1]/50">LLM</span><span className="font-mono text-xs">{config.llmProvider === "platform" ? "Nastar" : config.llmProvider} / {config.llmModel}</span></div>
                 <div className="flex justify-between"><span className="text-[#A1A1A1]/50">ERC-8004 Identity</span><span className="text-green-400 text-xs">Auto-minted</span></div>
-                <div className="flex justify-between"><span className="text-[#A1A1A1]/50">Hosted Runtime</span><span className="text-green-400 text-xs">OpenClaw</span></div>
+                <div className="flex justify-between"><span className="text-[#A1A1A1]/50">Hosted Runtime</span><span className="text-green-400 text-xs">Nastar Cloud</span></div>
               </div>
             </div>
 
