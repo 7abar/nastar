@@ -333,9 +333,44 @@ export default function LaunchPage() {
       const sponsorData = await sponsorRes.json();
       const agentNftId = sponsorData.agentNftId as number | null;
 
-      // 4. Store agent config
+      // 4. Store agent config + register hosted runtime
       setStatus("Storing agent configuration...");
       const apiKey = generateApiKey();
+
+      // Detect LLM provider from model name
+      const detectProvider = (model: string): string => {
+        if (model.startsWith("claude")) return "anthropic";
+        if (model.startsWith("gemini")) return "google";
+        return "openai";
+      };
+
+      const llmProvider = config.llmProvider === "platform"
+        ? detectProvider(config.llmModel)
+        : config.llmProvider;
+
+      // Register hosted agent runtime (LLM config)
+      await fetch(`${API_URL}/v1/hosted`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          agentWallet: agentWallet.address,
+          ownerAddress,
+          apiKey,
+          agentNftId,
+          serviceId: sponsorData.serviceId,
+          name: config.name,
+          description: config.description,
+          templateId: config.templateId,
+          systemPrompt: config.systemPrompt,
+          llmProvider,
+          llmModel: config.llmModel,
+          llmApiKey: config.llmProvider === "platform"
+            ? "PLATFORM_PROVIDED"
+            : config.llmApiKey,
+          spendingLimits: { maxPerCallUsd: 10, dailyLimitUsd: 50, requireConfirmAboveUsd: 25 },
+        }),
+      });
+
       await storeAgent({
         id: agentWallet.address,
         name: config.name,
@@ -346,8 +381,8 @@ export default function LaunchPage() {
         apiKey,
         apiKeyActive: true,
         agentNftId: agentNftId,
-        serviceId: null,
-        endpoint: `${API_URL}/api/agent/endpoint`,
+        serviceId: sponsorData.serviceId,
+        endpoint: `${API_URL}/v1/hosted/${agentWallet.address.toLowerCase()}`,
         tags: tagList,
         pricePerCall: primaryOffering.fee,
         paymentToken: primaryOffering.paymentToken,
@@ -773,6 +808,8 @@ export default function LaunchPage() {
                   {[
                     { id: "gpt-4o-mini", label: "GPT-4o Mini", desc: "Fast & cheap" },
                     { id: "gpt-4o", label: "GPT-4o", desc: "Smartest" },
+                    { id: "claude-haiku-3-5", label: "Claude Haiku", desc: "Fast & intelligent" },
+                    { id: "claude-sonnet-4", label: "Claude Sonnet", desc: "Best reasoning" },
                     { id: "gemini-2.0-flash", label: "Gemini 2.0 Flash", desc: "Google's fastest" },
                   ].map((m) => (
                     <button

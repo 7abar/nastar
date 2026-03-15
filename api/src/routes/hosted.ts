@@ -185,7 +185,20 @@ router.post("/:wallet", async (req: Request, res: Response) => {
 // ─── LLM dispatcher ───────────────────────────────────────────────────────────
 
 async function callLLM(agent: any, userMessage: string): Promise<string> {
-  const { llm_provider, llm_model, llm_api_key, system_prompt } = agent;
+  const { llm_provider, llm_model, system_prompt } = agent;
+
+  // Use platform API key if agent uses "PLATFORM_PROVIDED"
+  let llm_api_key = agent.llm_api_key;
+  if (llm_api_key === "PLATFORM_PROVIDED") {
+    if (llm_provider === "anthropic") {
+      llm_api_key = process.env.ANTHROPIC_API_KEY || "";
+    } else if (llm_provider === "openai") {
+      llm_api_key = process.env.OPENAI_API_KEY || "";
+    } else if (llm_provider === "google") {
+      llm_api_key = process.env.GOOGLE_API_KEY || "";
+    }
+    if (!llm_api_key) throw new Error("Platform API key not configured for " + llm_provider);
+  }
 
   if (llm_provider === "openai" || llm_provider === "google") {
     const baseUrl = llm_provider === "openai"
