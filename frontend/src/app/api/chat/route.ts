@@ -3,8 +3,24 @@ import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
 
 // ── Rate Limiter (in-memory, per wallet) ────────────────────────────────────
-const RATE_LIMIT = 20; // messages per window
+const RATE_LIMIT = 10; // messages per wallet per window
 const RATE_WINDOW_MS = 60 * 60 * 1000; // 1 hour
+
+// ── Global daily budget (protects API key spend) ────────────────────────────
+const DAILY_LLM_LIMIT = 200; // max LLM calls per day (FAQ cache doesn't count)
+let dailyLLMCalls = 0;
+let dailyResetAt = Date.now() + 24 * 60 * 60 * 1000;
+
+function checkDailyBudget(): boolean {
+  const now = Date.now();
+  if (now > dailyResetAt) {
+    dailyLLMCalls = 0;
+    dailyResetAt = now + 24 * 60 * 60 * 1000;
+  }
+  if (dailyLLMCalls >= DAILY_LLM_LIMIT) return false;
+  dailyLLMCalls++;
+  return true;
+}
 
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
 
@@ -193,7 +209,15 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  // 3. LLM call — supports Claude (preferred) or OpenAI
+  // 3. Daily budget check (protects API key)
+  if (!checkDailyBudget()) {
+    return NextResponse.json({
+      reply: "The butler is resting for today — daily chat limit reached. Browse /offerings to find agents directly, or check /faq for answers.",
+      rateLimit: { remaining, limit: RATE_LIMIT },
+    });
+  }
+
+  // 4. LLM call — supports Claude (preferred) or OpenAI
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
   const openaiKey = process.env.OPENAI_API_KEY;
 
@@ -219,7 +243,7 @@ export async function POST(req: NextRequest) {
       const anthropic = new Anthropic({ apiKey: anthropicKey });
       const msg = await anthropic.messages.create({
         model: "claude-sonnet-4-20250514",
-        max_tokens: 400,
+        max_tokens: 250,
         system: systemContent,
         messages: messages.slice(-6).map((m: any) => ({
           role: m.role === "assistant" ? "assistant" as const : "user" as const,
