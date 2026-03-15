@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
 
 // ── Rate Limiter (in-memory, per wallet) ────────────────────────────────────
@@ -192,16 +193,17 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  // 3. LLM call
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
+  // 3. LLM call — supports Claude (preferred) or OpenAI
+  const anthropicKey = process.env.ANTHROPIC_API_KEY;
+  const openaiKey = process.env.OPENAI_API_KEY;
+
+  if (!anthropicKey && !openaiKey) {
     return NextResponse.json({
       reply: "Nastar is not configured yet. Browse /offerings to see available agents, or check /faq for common questions.",
       rateLimit: { remaining, limit: RATE_LIMIT },
     });
   }
 
-  const openai = new OpenAI({ apiKey });
   const servicesContext = services || (await getCachedServices());
 
   // Build system prompt: use agent-specific context if chatting with a specific agent
@@ -209,20 +211,36 @@ export async function POST(req: NextRequest) {
     ? `${agentContext.systemPrompt}\n\nYou are "${agentContext.name}". ${agentContext.description || ""}\nBe helpful and concise.`
     : `${SYSTEM_PROMPT}\n\nAvailable agents:\n${servicesContext}`;
 
-  const selectedModel = model && ["gpt-4o-mini", "gpt-4o"].includes(model) ? model : "gpt-4o-mini";
-
   try {
-    const completion = await openai.chat.completions.create({
-      model: selectedModel,
-      messages: [
-        { role: "system", content: systemContent },
-        ...messages.slice(-6),
-      ],
-      max_tokens: 300,
-      temperature: 0.7,
-    });
+    let reply: string;
 
-    const reply = completion.choices[0]?.message?.content || "Could you try rephrasing?";
+    if (anthropicKey) {
+      // Claude
+      const anthropic = new Anthropic({ apiKey: anthropicKey });
+      const msg = await anthropic.messages.create({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 400,
+        system: systemContent,
+        messages: messages.slice(-6).map((m: any) => ({
+          role: m.role === "assistant" ? "assistant" as const : "user" as const,
+          content: m.content,
+        })),
+      });
+      reply = msg.content[0]?.type === "text" ? msg.content[0].text : "Could you try rephrasing?";
+    } else {
+      // OpenAI fallback
+      const openai = new OpenAI({ apiKey: openaiKey });
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          { role: "system", content: systemContent },
+          ...messages.slice(-6),
+        ],
+        max_tokens: 300,
+        temperature: 0.7,
+      });
+      reply = completion.choices[0]?.message?.content || "Could you try rephrasing?";
+    }
 
     return NextResponse.json({
       reply,
@@ -230,7 +248,7 @@ export async function POST(req: NextRequest) {
     });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Unknown error";
-    console.error("OpenAI error:", msg);
+    console.error("LLM error:", msg);
     return NextResponse.json({
       reply: "Something went wrong. Try again in a moment.",
       rateLimit: { remaining, limit: RATE_LIMIT },
