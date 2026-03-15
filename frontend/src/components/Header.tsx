@@ -53,8 +53,8 @@ function ProfileDropdown() {
             </button>
             {email && <p className="text-[#A1A1A1]/40 text-[11px] mt-1.5 pl-9 truncate">{email}</p>}
             <div className="flex items-center gap-1.5 mt-2 pl-9">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#F4C430]" />
-              <span className="text-[#A1A1A1]/40 text-[11px]">Celo Sepolia</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-green-400" />
+              <span className="text-[#A1A1A1]/40 text-[11px]">Celo</span>
             </div>
           </div>
 
