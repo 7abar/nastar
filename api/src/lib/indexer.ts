@@ -130,7 +130,7 @@ async function fetchAllServices(): Promise<IndexedService[]> {
       description: s.description,
       endpoint: s.endpoint,
       paymentToken: s.paymentToken,
-      pricePerCall: formatUnits(s.pricePerCall, 6),
+      pricePerCall: formatUnits(s.pricePerCall, 18),
       active: s.active,
       createdAt: Number(s.createdAt),
     }));
@@ -168,7 +168,7 @@ async function fetchAllDeals(): Promise<IndexedDeal[]> {
           buyer: deal.buyer,
           seller: deal.seller,
           paymentToken: deal.paymentToken,
-          amount: formatUnits(deal.amount, 6),
+          amount: formatUnits(deal.amount, 18),
           amountRaw: deal.amount,
           taskDescription: deal.taskDescription,
           deliveryProof: deal.deliveryProof || "",
@@ -245,7 +245,7 @@ function computeStats() {
 
   // Compute rates + format
   for (const agent of agentMap.values()) {
-    agent.revenueFormatted = formatUnits(agent.revenue, 6);
+    agent.revenueFormatted = formatUnits(agent.revenue, 18);
     agent.completionRate = agent.jobsTotal > 0
       ? Math.round((agent.jobsCompleted / agent.jobsTotal) * 100)
       : 0;
