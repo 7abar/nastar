@@ -110,7 +110,6 @@ export function Header() {
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2.5 flex-shrink-0">
           <span className="font-bold text-[#F5F5F5] text-base tracking-tight">Nastar</span>
-          <span className="hidden sm:inline text-[#A1A1A1]/40 text-xs">·</span>
           <span className="hidden sm:inline text-[#A1A1A1]/40 text-xs">Protocol</span>
         </Link>
 
