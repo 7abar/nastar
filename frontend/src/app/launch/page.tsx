@@ -305,68 +305,33 @@ export default function LaunchPage() {
       setStatus("Generating agent wallet...");
       const agentWallet = generateAgentWallet();
 
-      // 2. Mint ERC-8004 identity
-      setStatus("Minting ERC-8004 identity...");
-      const ownerBalance = (await client.readContract({
-        address: CONTRACTS.IDENTITY_REGISTRY,
-        abi: ERC8004_ABI,
-        functionName: "balanceOf",
-        args: [ownerAddress],
-      })) as bigint;
-
-      let agentNftId: number | null = null;
-
-      if (ownerBalance === 0n) {
-        const registerData = encodeFunctionData({
-          abi: ERC8004_ABI,
-          functionName: "register",
-          args: [`${API_URL}/api/agent-registration/pending`],
-        });
-        const mintHash = await provider.request({
-          method: "eth_sendTransaction",
-          params: [{ from: ownerAddress, to: CONTRACTS.IDENTITY_REGISTRY, data: registerData }],
-        });
-        await client.waitForTransactionReceipt({ hash: mintHash as `0x${string}` });
-      }
-
-      for (let i = 0n; i <= 200n; i++) {
-        try {
-          const owner = await client.readContract({
-            address: CONTRACTS.IDENTITY_REGISTRY,
-            abi: [{ type: "function", name: "ownerOf", inputs: [{ name: "tokenId", type: "uint256" }], outputs: [{ name: "", type: "address" }], stateMutability: "view" }] as const,
-            functionName: "ownerOf",
-            args: [i],
-          });
-          if ((owner as string).toLowerCase() === ownerAddress.toLowerCase()) {
-            agentNftId = Number(i);
-            break;
-          }
-        } catch { continue; }
-      }
-
-      // 3. Register first offering as service on-chain
+      // 2. Gas-Sponsored Deployment (server pays gas)
+      setStatus("Deploying agent on-chain (gas sponsored)...");
       const primaryOffering = config.offerings[0];
       const feeForChain = BigInt(Math.floor(parseFloat(primaryOffering.fee) * 1e18));
       const tagList = config.tags.split(",").map((t: string) => t.trim()).filter(Boolean);
-      setStatus("Registering service on-chain...");
-      const registerServiceData = encodeFunctionData({
-        abi: SERVICE_REGISTRY_ABI,
-        functionName: "registerService",
-        args: [
-          BigInt(agentNftId ?? 0),         // agentId
-          config.name,                      // name
-          primaryOffering.description,      // description
-          `${API_URL}/api/agent/endpoint`,  // endpoint
-          primaryOffering.paymentToken,     // paymentToken
-          feeForChain,                      // pricePerCall
-          tagList,                          // tags
-        ],
+
+      const sponsorRes = await fetch(`${API_URL}/v1/sponsor/deploy`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ownerAddress,
+          name: config.name,
+          description: primaryOffering.description,
+          endpoint: `${API_URL}/api/agent/endpoint`,
+          paymentToken: primaryOffering.paymentToken,
+          pricePerCall: feeForChain.toString(),
+          tags: tagList,
+        }),
       });
-      const svcHash = await provider.request({
-        method: "eth_sendTransaction",
-        params: [{ from: ownerAddress, to: CONTRACTS.SERVICE_REGISTRY, data: registerServiceData }],
-      });
-      await client.waitForTransactionReceipt({ hash: svcHash as `0x${string}` });
+
+      if (!sponsorRes.ok) {
+        const errData = await sponsorRes.json().catch(() => ({}));
+        throw new Error(errData.error || "Sponsored deployment failed");
+      }
+
+      const sponsorData = await sponsorRes.json();
+      const agentNftId = sponsorData.agentNftId as number | null;
 
       // 4. Store agent config
       setStatus("Storing agent configuration...");
@@ -390,22 +355,7 @@ export default function LaunchPage() {
         createdAt: Date.now(),
       });
 
-      // 5. Set token URI
-      if (agentNftId !== null) {
-        setStatus("Setting agent metadata URI...");
-        try {
-          const setUriData = encodeFunctionData({
-            abi: ERC8004_ABI,
-            functionName: "setAgentURI",
-            args: [BigInt(agentNftId), `${API_URL}/api/agent/${agentNftId}/metadata`],
-          });
-          const uriHash = await provider.request({
-            method: "eth_sendTransaction",
-            params: [{ from: ownerAddress, to: CONTRACTS.IDENTITY_REGISTRY, data: setUriData }],
-          });
-          await client.waitForTransactionReceipt({ hash: uriHash as `0x${string}` });
-        } catch { /* non-critical */ }
-      }
+      // 5. Agent metadata URI already set by sponsor endpoint
 
       setDeployedId(agentWallet.address);
       setStep("done");
@@ -1072,7 +1022,7 @@ export default function LaunchPage() {
             </div>
 
             <p className="text-[#A1A1A1]/30 text-[10px] text-center">
-              3 transactions required: mint identity NFT, register service, set metadata URI.
+              Gas fees are sponsored by Nastar Protocol. No CELO needed.
             </p>
 
             <button
