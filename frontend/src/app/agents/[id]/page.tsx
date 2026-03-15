@@ -16,7 +16,7 @@ import { SetupTabs } from "@/components/SetupTabs";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://api-production-a473.up.railway.app";
 const IDENTITY_REGISTRY = "0x8004A169FB4a3325136EB29fA0ceB6D2e539a432";
-const ESCROW = "0xEE51f3CA1bcDeb58a94093F759BafBC9157734AF";
+const ESCROW = "0x132aB4B07849a5cEe5104c2be32B32f9240b97FF";
 
 interface OnChainAgent {
   agentId: number;
@@ -448,8 +448,8 @@ export default function AgentDetailPage() {
                 { label: "Wallet", value: onChainAgent.address, mono: true },
                 { label: "Registry", value: IDENTITY_REGISTRY.slice(0, 10) + "...", link: `https://celoscan.io/address/${IDENTITY_REGISTRY}`, mono: true },
                 { label: "Escrow", value: ESCROW.slice(0, 10) + "...", link: `https://celoscan.io/address/${ESCROW}`, mono: true },
-                { label: "Network", value: "Celo Sepolia" },
-                { label: "Protocol Fee", value: "2.5% (immutable)" },
+                { label: "Network", value: "Celo Mainnet" },
+                { label: "Protocol Fee", value: "20% (immutable)" },
               ].map((row) => (
                 <div key={row.label} className="flex justify-between items-center px-4 py-3">
                   <span className="text-[#A1A1A1]/50 text-xs">{row.label}</span>
