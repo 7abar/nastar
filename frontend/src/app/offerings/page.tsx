@@ -3,18 +3,27 @@ export const dynamic = "force-dynamic";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { formatUnits } from "viem";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://api-production-a473.up.railway.app";
 
 interface ServiceItem {
   serviceId: number;
-  agentId: number;
+  agentId: string;
   name: string;
   description: string;
   endpoint: string;
   provider: string;
   pricePerCall: string;
   active: boolean;
+}
+
+interface AgentItem {
+  agentId: string;
+  provider: string;
+  serviceCount: number;
+  services: string[];
+  totalVolume: string;
 }
 
 const CATEGORIES = [
@@ -32,13 +41,22 @@ function matchCategory(name: string, desc: string, cat: string): boolean {
   const text = `${name} ${desc}`.toLowerCase();
   const map: Record<string, string[]> = {
     data: ["data", "feed", "price", "metric"],
-    security: ["audit", "security", "vulnerability", "solidity"],
+    security: ["audit", "security", "vulnerability", "solidity", "code review"],
     nft: ["nft", "mint", "token", "erc721"],
     social: ["tweet", "social", "compose", "content", "write"],
     defi: ["swap", "dex", "route", "defi", "liquidity"],
-    analytics: ["analy", "chain", "scrap", "web", "extract", "translat"],
+    analytics: ["analy", "chain", "scrap", "web", "extract", "translat", "research"],
   };
   return (map[cat] || []).some((kw) => text.includes(kw));
+}
+
+function formatPrice(raw: string): string {
+  try {
+    const val = parseFloat(formatUnits(BigInt(raw), 18));
+    return val % 1 === 0 ? val.toFixed(0) : val.toFixed(2);
+  } catch {
+    return raw;
+  }
 }
 
 function CategoryIcon({ type }: { type: string }) {
@@ -59,12 +77,14 @@ export default function OfferingsPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("all");
+  const [tab, setTab] = useState<"offerings" | "agents">("offerings");
 
   useEffect(() => {
     async function load() {
       try {
-        const res = await fetch(`${API_URL}/v1/services`);
-        setServices(await res.json());
+        const res = await fetch(`${API_URL}/services`);
+        const data = await res.json();
+        setServices(data.services || data || []);
       } catch {}
       setLoading(false);
     }
@@ -72,6 +92,25 @@ export default function OfferingsPage() {
     const iv = setInterval(load, 15_000);
     return () => clearInterval(iv);
   }, []);
+
+  // Derive agents from services
+  const agentMap = new Map<string, AgentItem>();
+  for (const svc of services) {
+    const id = svc.agentId;
+    if (!agentMap.has(id)) {
+      agentMap.set(id, {
+        agentId: id,
+        provider: svc.provider,
+        serviceCount: 0,
+        services: [],
+        totalVolume: "0",
+      });
+    }
+    const a = agentMap.get(id)!;
+    a.serviceCount++;
+    a.services.push(svc.name);
+  }
+  const agents = Array.from(agentMap.values());
 
   const filtered = services.filter((s) => {
     if (!matchCategory(s.name, s.description, category)) return false;
@@ -82,81 +121,187 @@ export default function OfferingsPage() {
     return true;
   });
 
+  const filteredAgents = agents.filter((a) => {
+    if (!search) return true;
+    const q = search.toLowerCase();
+    return a.services.some((s) => s.toLowerCase().includes(q)) || a.provider.toLowerCase().includes(q);
+  });
+
   return (
     <div className="min-h-screen bg-[#0A0A0A] text-[#F5F5F5]">
       <div className="max-w-6xl mx-auto px-4 py-10">
-        {/* Header */}
+        {/* Header + Tabs */}
         <div className="mb-6">
-          <h1 className="text-3xl font-bold mb-1">Offerings</h1>
+          <h1 className="text-3xl font-bold mb-1">Browse</h1>
           <p className="text-[#A1A1A1]/60 text-sm">
-            {services.length} services available across {new Set(services.map((s) => s.agentId)).size} agents
+            {services.length} services across {agents.length} agents
           </p>
         </div>
 
-        {/* Search + Categories */}
+        {/* Tabs: Offerings | Agents */}
+        <div className="flex gap-0 mb-6 border-b border-white/[0.06]">
+          <button
+            onClick={() => setTab("offerings")}
+            className={`px-5 py-3 text-sm font-medium transition border-b-2 -mb-px ${
+              tab === "offerings"
+                ? "text-[#F4C430] border-[#F4C430]"
+                : "text-[#A1A1A1]/50 border-transparent hover:text-[#F5F5F5]"
+            }`}
+          >
+            Offerings
+          </button>
+          <button
+            onClick={() => setTab("agents")}
+            className={`px-5 py-3 text-sm font-medium transition border-b-2 -mb-px ${
+              tab === "agents"
+                ? "text-[#F4C430] border-[#F4C430]"
+                : "text-[#A1A1A1]/50 border-transparent hover:text-[#F5F5F5]"
+            }`}
+          >
+            Agents
+          </button>
+        </div>
+
+        {/* Search */}
         <div className="mb-6 space-y-3">
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search services..."
+            placeholder={tab === "offerings" ? "Search services..." : "Search agents..."}
             className="w-full px-4 py-3 rounded-xl bg-white/[0.04] border border-white/[0.08] text-[#F5F5F5] placeholder-[#A1A1A1]/30 focus:outline-none focus:border-[#F4C430]/40 text-sm transition"
           />
-          <div className="flex gap-2 overflow-x-auto pb-1">
-            {CATEGORIES.map((cat) => (
-              <button
-                key={cat.key}
-                onClick={() => setCategory(cat.key)}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs whitespace-nowrap transition ${
-                  category === cat.key
-                    ? "bg-[#F4C430] text-[#0A0A0A] font-bold"
-                    : "bg-white/[0.04] text-[#A1A1A1] hover:bg-white/[0.08]"
-                }`}
-              >
-                <CategoryIcon type={cat.icon} />
-                {cat.label}
-              </button>
-            ))}
-          </div>
+
+          {/* Category filter (only for Offerings tab) */}
+          {tab === "offerings" && (
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {CATEGORIES.map((cat) => (
+                <button
+                  key={cat.key}
+                  onClick={() => setCategory(cat.key)}
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs whitespace-nowrap transition ${
+                    category === cat.key
+                      ? "bg-[#F4C430] text-[#0A0A0A] font-bold"
+                      : "bg-white/[0.04] text-[#A1A1A1] hover:bg-white/[0.08]"
+                  }`}
+                >
+                  <CategoryIcon type={cat.icon} />
+                  {cat.label}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* Grid */}
-        {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[1, 2, 3, 4, 5, 6].map((i) => <div key={i} className="h-44 rounded-xl bg-white/[0.03] animate-pulse" />)}
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="text-center py-16">
-            <p className="text-[#A1A1A1]/40 mb-2">{search ? "No services match your search" : "No services in this category"}</p>
-            {search && <button onClick={() => setSearch("")} className="text-[#F4C430] text-sm hover:underline">Clear search</button>}
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filtered.map((svc) => (
-              <div key={svc.serviceId} className="p-5 rounded-xl glass-card hover:border-[#F4C430]/50 transition group flex flex-col">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-[#F4C430]/10 flex items-center justify-center text-[#F4C430] font-bold text-sm shrink-0">
-                      {svc.name.charAt(0)}
+        {/* ── Offerings Tab ──────────────────────────────────────── */}
+        {tab === "offerings" && (
+          <>
+            {loading ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {[1, 2, 3, 4, 5, 6].map((i) => <div key={i} className="h-44 rounded-xl bg-white/[0.03] animate-pulse" />)}
+              </div>
+            ) : filtered.length === 0 ? (
+              <div className="text-center py-16">
+                <p className="text-[#A1A1A1]/40 mb-2">{search ? "No services match your search" : "No services in this category"}</p>
+                {search && <button onClick={() => setSearch("")} className="text-[#F4C430] text-sm hover:underline">Clear search</button>}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filtered.map((svc, idx) => (
+                  <div key={idx} className="p-5 rounded-xl glass-card hover:border-[#F4C430]/50 transition group flex flex-col">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-[#F4C430]/10 flex items-center justify-center text-[#F4C430] font-bold text-sm shrink-0">
+                          {svc.name.charAt(0)}
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-[#F5F5F5] text-sm group-hover:text-[#F4C430] transition">{svc.name}</h3>
+                          <p className="text-[#A1A1A1]/30 text-[10px] font-mono">Agent #{svc.agentId}</p>
+                        </div>
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="font-semibold text-[#F5F5F5] text-sm group-hover:text-[#F4C430] transition">{svc.name}</h3>
-                      <p className="text-[#A1A1A1]/30 text-[10px] font-mono">Agent #{svc.agentId}</p>
+                    <p className="text-[#A1A1A1]/60 text-xs leading-relaxed flex-1 mb-4 line-clamp-3">{svc.description}</p>
+                    <div className="flex items-center justify-between pt-3 border-t border-white/[0.06]">
+                      <span className="text-[#F4C430] font-semibold text-sm">{formatPrice(svc.pricePerCall)} USDC</span>
+                      <Link
+                        href={`/chat?agent=${svc.agentId}&name=${encodeURIComponent(svc.name)}`}
+                        className="px-4 py-1.5 rounded-lg bg-[#F4C430] text-[#0A0A0A] text-xs font-bold hover:shadow-[0_0_10px_rgba(244,196,48,0.3)] transition"
+                      >
+                        Hire
+                      </Link>
                     </div>
                   </div>
-                </div>
-                <p className="text-[#A1A1A1]/60 text-xs leading-relaxed flex-1 mb-4 line-clamp-3">{svc.description}</p>
-                <div className="flex items-center justify-between pt-3 border-t border-white/[0.06]">
-                  <span className="text-[#F4C430] font-semibold text-sm">{svc.pricePerCall} USDC</span>
-                  <Link
-                    href={`/chat?agent=${svc.agentId}&name=${encodeURIComponent(svc.name)}`}
-                    className="px-4 py-1.5 rounded-lg bg-[#F4C430] text-[#0A0A0A] text-xs font-bold hover:shadow-[0_0_10px_rgba(244,196,48,0.3)] transition"
-                  >
-                    Hire
-                  </Link>
-                </div>
+                ))}
               </div>
-            ))}
-          </div>
+            )}
+          </>
+        )}
+
+        {/* ── Agents Tab ─────────────────────────────────────────── */}
+        {tab === "agents" && (
+          <>
+            {loading ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {[1, 2, 3, 4].map((i) => <div key={i} className="h-40 rounded-xl bg-white/[0.03] animate-pulse" />)}
+              </div>
+            ) : filteredAgents.length === 0 ? (
+              <div className="text-center py-16">
+                <p className="text-[#A1A1A1]/40">No agents found</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {filteredAgents.map((agent) => {
+                  const agentServices = services.filter((s) => s.agentId === agent.agentId);
+                  const minPrice = agentServices.length > 0
+                    ? Math.min(...agentServices.map((s) => parseFloat(formatUnits(BigInt(s.pricePerCall), 18))))
+                    : 0;
+
+                  return (
+                    <div key={agent.agentId} className="p-5 rounded-xl glass-card hover:border-[#F4C430]/50 transition group">
+                      <div className="flex items-start gap-4 mb-4">
+                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#F4C430]/20 to-[#FF9F1C]/10 flex items-center justify-center shrink-0">
+                          <span className="text-[#F4C430] font-bold text-lg">#{agent.agentId}</span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <h3 className="font-semibold text-[#F5F5F5] text-sm group-hover:text-[#F4C430] transition">Agent #{agent.agentId}</h3>
+                            <span className="px-2 py-0.5 rounded-full bg-green-400/10 text-green-400 text-[10px] font-medium">Active</span>
+                          </div>
+                          <p className="text-[#A1A1A1]/40 text-[11px] font-mono truncate">{agent.provider}</p>
+                        </div>
+                      </div>
+
+                      {/* Services offered by this agent */}
+                      <div className="mb-4">
+                        <p className="text-[#A1A1A1]/40 text-[10px] uppercase tracking-wider mb-2">Services ({agent.serviceCount})</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {agent.services.map((name, i) => (
+                            <span key={i} className="px-2 py-0.5 rounded text-[11px] bg-white/[0.06] text-[#A1A1A1]/70">
+                              {name}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-3 border-t border-white/[0.06]">
+                        <div className="flex items-center gap-4">
+                          <div>
+                            <p className="text-[#F4C430] font-semibold text-sm">from ${minPrice.toFixed(0)}</p>
+                            <p className="text-[#A1A1A1]/30 text-[9px]">per task</p>
+                          </div>
+                        </div>
+                        <Link
+                          href={`/profile/${agent.provider}`}
+                          className="px-4 py-1.5 rounded-lg border border-[#F4C430]/30 text-[#F4C430] text-xs font-medium hover:bg-[#F4C430]/10 transition"
+                        >
+                          View Profile
+                        </Link>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
