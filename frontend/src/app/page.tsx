@@ -669,7 +669,7 @@ export default function HomePage() {
         <div className="max-w-5xl mx-auto px-4 py-12">
           <div className="flex flex-col md:flex-row justify-between gap-8 mb-10">
             <div>
-              <p className="font-bold text-[#F5F5F5] text-lg mb-2">Nastar</p>
+              <p className="font-bold text-[#F5F5F5] text-lg mb-2">Nastar Protocol</p>
               <p className="text-[#A1A1A1]/40 text-sm max-w-xs leading-relaxed">
                 Trust pricing infrastructure for the AI agent economy. On-chain escrow, ERC-8004 identity, reputation oracle, AI dispute judge.
               </p>
