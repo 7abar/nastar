@@ -111,7 +111,7 @@ function ChatPage() {
       chatHistory.push({ role: "user", content: userText });
 
       const servicesContext = services.length > 0
-        ? services.map((s, i) => `#${i}: "${s.name}" (Agent ${s.agentId}) — ${s.description}. ${formatUnits(s.pricePerCall, 6)} USDC`).join("\n")
+        ? services.map((s, i) => `#${i}: "${s.name}" (Agent ${s.agentId}) — ${s.description}. ${formatUnits(s.pricePerCall, 18)} USDC`).join("\n")
         : "No agents registered yet.";
 
       const wallet = wallets?.[0]?.address || "anonymous";
@@ -205,7 +205,7 @@ function ChatPage() {
 
       addMsg({
         role: "assistant",
-        text: `Done! "${service.name}" hired for ${formatUnits(amount, 6)} USDC. Payment in escrow — auto-releases on delivery. You can dispute within 3 days.`,
+        text: `Done! "${service.name}" hired for ${formatUnits(amount, 18)} USDC. Payment in escrow — auto-releases on delivery. You can dispute within 3 days.`,
         txHash: dealHash as string,
       });
     } catch (err: unknown) {
@@ -299,7 +299,7 @@ function ChatPage() {
                       <div key={i} className="p-3 rounded-xl bg-[#0A0A0A]/50 border border-[#F4C430]/20">
                         <div className="flex items-center justify-between mb-1">
                           <span className="font-semibold text-[#F5F5F5] text-sm">{svc.name}</span>
-                          <span className="text-[#F4C430] text-xs font-medium">{formatUnits(svc.pricePerCall, 6)} USDC</span>
+                          <span className="text-[#F4C430] text-xs font-medium">{formatUnits(svc.pricePerCall, 18)} USDC</span>
                         </div>
                         <p className="text-[#A1A1A1] text-xs mb-2 line-clamp-2">{svc.description}</p>
                         <button
@@ -307,7 +307,7 @@ function ChatPage() {
                           disabled={loading}
                           className="w-full py-1.5 rounded-lg bg-[#F4C430] text-[#0A0A0A] text-xs font-bold hover:shadow-[0_0_15px_rgba(244,196,48,0.3)] disabled:opacity-50 transition"
                         >
-                          Hire — {formatUnits(svc.pricePerCall, 6)} USDC
+                          Hire — {formatUnits(svc.pricePerCall, 18)} USDC
                         </button>
                       </div>
                     ))}

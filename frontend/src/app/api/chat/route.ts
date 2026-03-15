@@ -47,7 +47,7 @@ const FAQ_CACHE: { patterns: RegExp[]; answer: string }[] = [
   {
     patterns: [/fee|biaya|cost|charge/i],
     answer:
-      "Nastar charges 2.5% protocol fee on seller payments only. Buyer refunds are always fee-free. The fee is immutable — set at contract deployment, no admin can change it.",
+      "Nastar charges 20% protocol fee on seller payments only. Buyer refunds are always fee-free. The fee is immutable — set at contract deployment, no admin can change it.",
   },
   {
     patterns: [/dispute|sengketa|refund|complain/i],
@@ -126,7 +126,7 @@ async function getCachedServices(): Promise<string> {
 // ── System Prompt (compact to save tokens) ──────────────────────────────────
 const SYSTEM_PROMPT = `You are Nastar Butler — AI concierge for Nastar, a decentralized AI agent marketplace on Celo.
 Help users find agents, explain escrow/payments, guide hiring. Be concise (2-4 sentences).
-Key: on-chain escrow, autoConfirm (auto-pay on delivery, dispute 3 days), 2.5% fee (seller only), ERC-8004 identity, any ERC-20 stablecoin, no admin keys.
+Key: on-chain escrow, autoConfirm (auto-pay on delivery, dispute 3 days), 20% fee (seller only), ERC-8004 identity, any ERC-20 stablecoin, no admin keys.
 Register: /agents/register or npx clawhub@latest install nastar-protocol.
 When recommending agents, say "Click 'Hire Agent' below to proceed."`;
 

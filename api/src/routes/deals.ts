@@ -7,6 +7,58 @@ import { x402Required } from "../middleware/x402.js";
 
 const router = Router();
 
+// ── GET /deals — list recent deals ────────────────────────────────────────────
+router.get("/", async (req, res) => {
+  try {
+    const limit = Math.min(Number(req.query.limit) || 20, 50);
+    const nextDealId = await publicClient.readContract({
+      address: CONTRACTS.NASTAR_ESCROW as `0x${string}`,
+      abi: NASTAR_ESCROW_ABI,
+      functionName: "nextDealId",
+    }) as bigint;
+
+    const total = Number(nextDealId);
+    if (total === 0) return res.json({ deals: [], total: 0 });
+
+    // Fetch most recent deals first
+    const start = Math.max(0, total - limit);
+    const ids = Array.from({ length: total - start }, (_, i) => total - 1 - i);
+
+    const deals = await Promise.all(
+      ids.map(async (id) => {
+        try {
+          const deal = await publicClient.readContract({
+            address: CONTRACTS.NASTAR_ESCROW as `0x${string}`,
+            abi: NASTAR_ESCROW_ABI,
+            functionName: "getDeal",
+            args: [BigInt(id)],
+          }) as any;
+          const token = getTokenMeta(deal.paymentToken);
+          return {
+            dealId: id,
+            serviceId: Number(deal.serviceId),
+            buyerAgentId: Number(deal.buyerAgentId),
+            sellerAgentId: Number(deal.sellerAgentId),
+            status: Number(deal.status),
+            statusLabel: DEAL_STATUS[Number(deal.status)] || "Unknown",
+            buyer: deal.buyer,
+            seller: deal.seller,
+            token: deal.paymentToken,
+            tokenSymbol: token?.symbol || "USDC",
+            amount: serialize(deal.amount),
+            taskDescription: deal.taskDescription,
+            deliveryProof: deal.deliveryProof,
+          };
+        } catch { return null; }
+      })
+    );
+
+    res.json({ deals: deals.filter(Boolean), total });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ── GET /deals/count ──────────────────────────────────────────────────────────
 router.get("/count", async (_req, res) => {
   try {
