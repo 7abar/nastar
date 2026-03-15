@@ -1,17 +1,14 @@
 "use client";
 export const dynamic = "force-dynamic";
 
-import { useState, useEffect, useCallback } from "react";
-import { usePrivy, useWallets } from "@privy-io/react-auth";
-import { TOKEN_LIST, type TokenMeta } from "@/lib/contracts";
+import { useState, useEffect } from "react";
+import { TOKEN_LIST } from "@/lib/contracts";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://api-production-a473.up.railway.app";
 
-// FX Rates Ticker
-function FxTicker() {
+// ─── Live rates from oracle ───────────────────────────────────────────────────
+function useOracleRates() {
   const [rates, setRates] = useState<Record<string, { onchain: number | null; pyth: number | null; divergencePct: number | null }>>({});
-  const [loading, setLoading] = useState(true);
-
   useEffect(() => {
     async function load() {
       try {
@@ -19,382 +16,333 @@ function FxTicker() {
         const data = await res.json();
         setRates(data.rates || {});
       } catch {}
-      setLoading(false);
     }
     load();
-    const t = setInterval(load, 30000); // refresh every 30s
+    const t = setInterval(load, 30_000);
     return () => clearInterval(t);
   }, []);
-
-  // Show only USDm base pairs
-  const usdPairs = Object.entries(rates).filter(([key]) => key.startsWith("USDm/"));
-
-  if (loading) return (
-    <div className="flex gap-6 animate-pulse">
-      {[0,1,2,3].map(i => <div key={i} className="h-4 w-24 bg-white/10 rounded" />)}
-    </div>
-  );
-
-  return (
-    <div className="flex flex-wrap gap-4 text-xs">
-      {usdPairs.map(([key, r]) => {
-        const symbol = key.replace("USDm/", "");
-        const token = TOKEN_LIST.find(t => t.symbol === symbol);
-        const rate = r.onchain ?? r.pyth;
-        const hasDivergence = r.divergencePct !== null && r.divergencePct > 1;
-        return (
-          <div key={key} className="flex items-center gap-1.5">
-            <span>{token?.flag}</span>
-            <span className="text-[#A1A1A1]">{key}</span>
-            <span className={`font-mono font-bold ${hasDivergence ? "text-yellow-400" : "text-white"}`}>
-              {rate ? rate.toFixed(4) : "—"}
-            </span>
-            {hasDivergence && (
-              <span className="text-yellow-400/70" title={`Mento vs Pyth divergence: ${r.divergencePct?.toFixed(2)}%`}>
-                ⚠ {r.divergencePct?.toFixed(1)}%
-              </span>
-            )}
-            {r.onchain && r.pyth && !hasDivergence && (
-              <span className="text-green-400/50 text-[10px]">✓</span>
-            )}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-interface Quote {
-  expectedAmountOut: string;
-  exchangeRate: string;
-  priceImpact: string;
-}
-
-interface SwapTx {
-  step: number;
-  type: string;
-  description: string;
-  to: string;
-  data: string;
-  value: string;
+  return rates;
 }
 
 export default function SwapPage() {
-  const { authenticated, login } = usePrivy();
-  const { wallets } = useWallets();
-
-  const [tokenIn, setTokenIn] = useState<TokenMeta>(TOKEN_LIST[0]);   // USDm
-  const [tokenOut, setTokenOut] = useState<TokenMeta>(TOKEN_LIST[1]); // EURm
-  const [amountIn, setAmountIn] = useState("10");
-  const [quote, setQuote] = useState<Quote | null>(null);
+  const rates = useOracleRates();
+  const [activeTab, setActiveTab] = useState<"flow" | "api" | "rates">("flow");
+  const [quoteResult, setQuoteResult] = useState<string>("");
   const [quoteLoading, setQuoteLoading] = useState(false);
-  const [quoteError, setQuoteError] = useState("");
+  const [from, setFrom] = useState("USDm");
+  const [to, setTo] = useState("EURm");
+  const [amount, setAmount] = useState("100");
 
-  const [status, setStatus] = useState("");
-  const [txHash, setTxHash] = useState("");
-  const [swapping, setSwapping] = useState(false);
-
-  // ─── Quote ────────────────────────────────────────────────────────────────
-
-  const fetchQuote = useCallback(async () => {
-    if (!amountIn || parseFloat(amountIn) <= 0 || tokenIn.address === tokenOut.address) return;
+  async function runQuote() {
     setQuoteLoading(true);
-    setQuoteError("");
+    setQuoteResult("");
     try {
-      const res = await fetch(
-        `${API_URL}/v1/swap/quote?tokenIn=${tokenIn.address}&tokenOut=${tokenOut.address}&amountIn=${amountIn}`
-      );
+      const res = await fetch(`${API_URL}/v1/swap/quote?from=${from}&to=${to}&amountIn=${amount}`);
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      setQuote(data);
+      setQuoteResult(JSON.stringify(data, null, 2));
     } catch (err) {
-      setQuoteError((err as Error).message);
-      setQuote(null);
-    } finally {
-      setQuoteLoading(false);
+      setQuoteResult("Error: " + (err as Error).message);
     }
-  }, [tokenIn, tokenOut, amountIn]);
-
-  useEffect(() => {
-    const t = setTimeout(fetchQuote, 600);
-    return () => clearTimeout(t);
-  }, [fetchQuote]);
-
-  // ─── Swap ─────────────────────────────────────────────────────────────────
-
-  async function executeSwap() {
-    if (!authenticated || !quote) return;
-    const wallet = wallets[0];
-    if (!wallet) return;
-
-    setSwapping(true);
-    setStatus("Building swap...");
-    setTxHash("");
-
-    try {
-      const address = wallet.address;
-      const provider = await wallet.getEthereumProvider();
-
-      // Build tx params from API
-      const buildRes = await fetch(`${API_URL}/v1/swap/build`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          tokenIn: tokenIn.address,
-          tokenOut: tokenOut.address,
-          amountIn,
-          recipient: address,
-          owner: address,
-          slippageTolerance: 0.5,
-          deadlineMinutes: 10,
-        }),
-      });
-      const buildData = await buildRes.json();
-      if (!buildRes.ok) throw new Error(buildData.error);
-
-      const txs: SwapTx[] = buildData.transactions;
-
-      // Execute each step in order
-      for (const tx of txs) {
-        setStatus(`Step ${tx.step}/${buildData.totalSteps}: ${tx.description}`);
-        const hash = await provider.request({
-          method: "eth_sendTransaction",
-          params: [{
-            from: address,
-            to: tx.to,
-            data: tx.data,
-            value: tx.value === "0" ? "0x0" : `0x${parseInt(tx.value).toString(16)}`,
-          }],
-        });
-        if (tx.type === "swap") setTxHash(hash as string);
-        // Wait briefly between steps
-        if (txs.indexOf(tx) < txs.length - 1) await new Promise(r => setTimeout(r, 2000));
-      }
-
-      setStatus("Swap complete!");
-      fetchQuote();
-    } catch (err) {
-      setStatus("Error: " + (err as Error).message);
-    } finally {
-      setSwapping(false);
-    }
+    setQuoteLoading(false);
   }
 
-  // ─── Flip tokens ──────────────────────────────────────────────────────────
-  function flip() {
-    const tmp = tokenIn;
-    setTokenIn(tokenOut);
-    setTokenOut(tmp);
-    setQuote(null);
-  }
-
-  const sameToken = tokenIn.address === tokenOut.address;
+  const usdPairs = Object.entries(rates).filter(([k]) => k.startsWith("USDm/"));
 
   return (
-    <div className="min-h-screen bg-[#0A0A0A] text-[#F5F5F5] flex items-center justify-center px-4 py-12">
-      <div className="w-full max-w-md">
+    <div className="min-h-screen bg-[#0A0A0A] text-[#F5F5F5]">
+      <div className="max-w-5xl mx-auto px-4 py-12">
 
         {/* Header */}
-        <div className="mb-6">
+        <div className="mb-8">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#F4C430]/10 text-[#F4C430] text-xs font-medium mb-3">
             <span className="w-1.5 h-1.5 rounded-full bg-[#F4C430] animate-pulse" />
-            Mento Protocol
+            Agent-Native · Mento Protocol
           </div>
-          <h1 className="text-2xl font-bold">Multi-Currency Swap</h1>
-          <p className="text-[#A1A1A1] text-sm mt-1">Swap between Mento stablecoins on Celo. No slippage. Instant settlement.</p>
+          <h1 className="text-3xl font-bold mb-2">Multi-Currency Swap</h1>
+          <p className="text-[#A1A1A1] max-w-xl">
+            Agents swap currencies programmatically — no human clicks required.
+            A remittance agent receives USDm, auto-swaps to EURm, pays a European seller.
+            All on-chain, all autonomous.
+          </p>
         </div>
 
-        {/* Swap card */}
-        <div className="rounded-2xl bg-white/5 border border-white/10 p-5 space-y-3">
-
-          {/* Token In */}
-          <div className="rounded-xl bg-white/5 border border-white/10 p-4">
-            <div className="flex justify-between items-center mb-2">
-              <span className="text-xs text-[#A1A1A1]">You pay</span>
-            </div>
-            <div className="flex gap-3 items-center">
-              <input
-                type="number"
-                value={amountIn}
-                onChange={(e) => setAmountIn(e.target.value)}
-                className="flex-1 bg-transparent text-2xl font-bold text-white outline-none w-0"
-                placeholder="0.00"
-                min="0"
-                step="0.01"
-              />
-              <TokenSelect value={tokenIn} onChange={setTokenIn} exclude={tokenOut.address} />
-            </div>
-          </div>
-
-          {/* Flip button */}
-          <div className="flex justify-center">
-            <button
-              onClick={flip}
-              className="w-9 h-9 rounded-full bg-white/10 hover:bg-[#F4C430]/20 border border-white/10 hover:border-[#F4C430]/30 flex items-center justify-center text-[#A1A1A1] hover:text-[#F4C430] transition text-lg"
-            >
-              ⇅
-            </button>
-          </div>
-
-          {/* Token Out */}
-          <div className="rounded-xl bg-white/5 border border-white/10 p-4">
-            <div className="flex justify-between items-center mb-2">
-              <span className="text-xs text-[#A1A1A1]">You receive</span>
-              {quoteLoading && <span className="text-xs text-[#A1A1A1] animate-pulse">Getting quote...</span>}
-            </div>
-            <div className="flex gap-3 items-center">
-              <div className="flex-1 text-2xl font-bold text-white">
-                {quote ? (
-                  <span className="text-green-400">{parseFloat(quote.expectedAmountOut).toFixed(4)}</span>
-                ) : (
-                  <span className="text-white/20">0.00</span>
-                )}
-              </div>
-              <TokenSelect value={tokenOut} onChange={setTokenOut} exclude={tokenIn.address} />
-            </div>
-          </div>
-
-          {/* Quote details */}
-          {quote && !sameToken && (
-            <div className="px-4 py-3 rounded-lg bg-white/5 text-xs space-y-1.5">
-              <div className="flex justify-between text-[#A1A1A1]">
-                <span>Rate</span>
-                <span className="text-white font-mono">1 {tokenIn.symbol} = {parseFloat(quote.exchangeRate).toFixed(4)} {tokenOut.symbol}</span>
-              </div>
-              <div className="flex justify-between text-[#A1A1A1]">
-                <span>Price impact</span>
-                <span className="text-green-400">{quote.priceImpact}</span>
-              </div>
-              <div className="flex justify-between text-[#A1A1A1]">
-                <span>Slippage tolerance</span>
-                <span className="text-white">0.5%</span>
-              </div>
-              <div className="flex justify-between text-[#A1A1A1]">
-                <span>Protocol</span>
-                <span className="text-[#F4C430]">Mento v2</span>
-              </div>
-            </div>
-          )}
-
-          {quoteError && (
-            <div className="px-4 py-3 rounded-lg bg-red-400/10 border border-red-400/20 text-xs text-red-400">
-              {quoteError}
-            </div>
-          )}
-
-          {sameToken && (
-            <div className="px-4 py-3 rounded-lg bg-yellow-400/10 border border-yellow-400/20 text-xs text-yellow-400">
-              Select different tokens to swap
-            </div>
-          )}
-
-          {/* Action button */}
-          {!authenticated ? (
-            <button
-              onClick={login}
-              className="w-full py-4 rounded-xl gradient-btn font-semibold text-base hover:shadow-[0_0_20px_#F4C430] transition"
-            >
-              Connect Wallet to Swap
-            </button>
-          ) : (
-            <button
-              onClick={executeSwap}
-              disabled={!quote || swapping || sameToken || parseFloat(amountIn) <= 0}
-              className="w-full py-4 rounded-xl gradient-btn font-semibold text-base hover:shadow-[0_0_20px_#F4C430] transition disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              {swapping ? (
-                <span className="flex items-center justify-center gap-2">
-                  <span className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
-                  {status || "Swapping..."}
-                </span>
-              ) : (
-                `Swap ${tokenIn.symbol} → ${tokenOut.symbol}`
-              )}
-            </button>
-          )}
-
-          {/* Tx success */}
-          {txHash && (
-            <a
-              href={`https://sepolia.celoscan.io/tx/${txHash}`}
-              target="_blank" rel="noopener"
-              className="block text-center text-xs text-[#F4C430] hover:underline"
-            >
-              View on Celoscan ↗
-            </a>
-          )}
-        </div>
-
-        {/* Live FX Rates ticker */}
-        <div className="mt-4 p-4 rounded-xl bg-white/5 border border-white/10">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-[#A1A1A1] text-xs uppercase tracking-wider">Live FX Rates</p>
-            <div className="flex items-center gap-3 text-[10px] text-[#A1A1A1]/50">
-              <span className="flex items-center gap-1"><span className="text-green-400 text-[8px]">●</span> Mento on-chain</span>
-              <span className="flex items-center gap-1"><span className="text-blue-400 text-[8px]">●</span> Pyth real-world</span>
-            </div>
-          </div>
-          <FxTicker />
-        </div>
-
-        {/* Supported tokens */}
-        <div className="mt-4 p-4 rounded-xl bg-white/5 border border-white/10">
-          <p className="text-[#A1A1A1] text-xs mb-3 uppercase tracking-wider">Supported tokens</p>
-          <div className="grid grid-cols-5 gap-2">
-            {TOKEN_LIST.map((t) => (
-              <div key={t.symbol} className="text-center">
-                <div className="text-2xl mb-1">{t.flag}</div>
-                <div className="text-[10px] font-bold text-white">{t.symbol}</div>
-                <div className="text-[9px] text-[#A1A1A1] leading-tight">{t.name.replace("Mento ", "")}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-      </div>
-    </div>
-  );
-}
-
-// ─── Token Selector ───────────────────────────────────────────────────────────
-
-function TokenSelect({ value, onChange, exclude }: {
-  value: TokenMeta;
-  onChange: (t: TokenMeta) => void;
-  exclude?: string;
-}) {
-  const [open, setOpen] = useState(false);
-  const filtered = TOKEN_LIST.filter(t => t.address !== exclude);
-
-  return (
-    <div className="relative">
-      <button
-        onClick={() => setOpen(!open)}
-        className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 transition"
-      >
-        <span className="text-lg">{value.flag}</span>
-        <span className="font-bold text-white text-sm">{value.symbol}</span>
-        <span className="text-[#A1A1A1] text-xs">▾</span>
-      </button>
-
-      {open && (
-        <div className="absolute right-0 top-full mt-2 w-52 bg-[#111] border border-white/10 rounded-xl shadow-xl z-20 overflow-hidden">
-          {filtered.map((t) => (
-            <button
-              key={t.symbol}
-              onClick={() => { onChange(t); setOpen(false); }}
-              className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-white/5 transition text-left ${t.address === value.address ? "bg-[#F4C430]/10" : ""}`}
-            >
-              <span className="text-xl">{t.flag}</span>
-              <div>
-                <div className="font-bold text-white text-sm">{t.symbol}</div>
-                <div className="text-[#A1A1A1] text-xs">{t.name}</div>
-              </div>
-              {t.address === value.address && <span className="ml-auto text-[#F4C430] text-xs">✓</span>}
+        {/* Tabs */}
+        <div className="flex gap-1 p-1 rounded-xl bg-white/5 border border-white/10 w-fit mb-8">
+          {[
+            { id: "flow", label: "Agent Flow" },
+            { id: "api", label: "API Reference" },
+            { id: "rates", label: "Live FX Rates" },
+          ].map(tab => (
+            <button key={tab.id} onClick={() => setActiveTab(tab.id as typeof activeTab)}
+              className={`px-5 py-2 rounded-lg text-sm font-medium transition ${activeTab === tab.id ? "bg-[#F4C430] text-[#0A0A0A]" : "text-[#A1A1A1] hover:text-white"}`}>
+              {tab.label}
             </button>
           ))}
         </div>
-      )}
+
+        {/* ── Agent Flow tab ─────────────────────────────────────────────── */}
+        {activeTab === "flow" && (
+          <div className="space-y-6">
+
+            {/* How agents use this */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {[
+                {
+                  step: "1",
+                  title: "Deal Completed",
+                  desc: "Buyer pays 100 USDm into escrow. Deal delivered → Nastar releases 80 USDm to seller agent.",
+                  color: "border-[#F4C430]/30 bg-[#F4C430]/5",
+                  badge: "text-[#F4C430]",
+                },
+                {
+                  step: "2",
+                  title: "Auto-Swap Triggered",
+                  desc: "Seller agent is configured to receive EURm. Runtime calls /v1/swap/build, executes approval + swap on-chain.",
+                  color: "border-purple-400/30 bg-purple-400/5",
+                  badge: "text-purple-400",
+                },
+                {
+                  step: "3",
+                  title: "Settled in Local Currency",
+                  desc: "Seller receives ~73.6 EURm in their wallet. No human involvement. Mento AMM executes at live rate.",
+                  color: "border-green-400/30 bg-green-400/5",
+                  badge: "text-green-400",
+                },
+              ].map(s => (
+                <div key={s.step} className={`rounded-xl border p-5 ${s.color}`}>
+                  <div className={`text-xs font-bold uppercase tracking-wider mb-2 ${s.badge}`}>Step {s.step}</div>
+                  <h3 className="font-semibold text-white mb-2">{s.title}</h3>
+                  <p className="text-[#A1A1A1] text-sm leading-relaxed">{s.desc}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Agent config snippet */}
+            <div className="rounded-xl border border-white/10 bg-white/5 overflow-hidden">
+              <div className="flex items-center justify-between px-5 py-3 border-b border-white/10">
+                <span className="text-sm font-medium">Agent auto-swap config</span>
+                <span className="text-xs text-[#A1A1A1] font-mono">hosted-agent runtime</span>
+              </div>
+              <pre className="p-5 text-sm text-green-300 font-mono overflow-x-auto leading-relaxed">{`// When registering a hosted agent:
+{
+  "name": "Remittance Agent EU",
+  "llmProvider": "openai",
+  "llmModel": "gpt-4o-mini",
+  "autoSwap": {
+    "enabled": true,
+    "targetToken": "EURm",           // Receive in Euros
+    "targetAddress": "0x6B172e...",   // EURm on Celo Sepolia
+    "slippageTolerance": 0.5,
+    "triggerOnDealComplete": true     // Swap immediately after payout
+  },
+  "spendingLimits": {
+    "maxPerCallUsd": 10,
+    "dailyLimitUsd": 500
+  }
+}`}</pre>
+            </div>
+
+            {/* MCP tool example */}
+            <div className="rounded-xl border border-white/10 bg-white/5 overflow-hidden">
+              <div className="flex items-center justify-between px-5 py-3 border-b border-white/10">
+                <span className="text-sm font-medium">MCP tool call (agent-to-agent)</span>
+                <span className="text-xs text-[#A1A1A1] font-mono">nastar_swap_quote</span>
+              </div>
+              <pre className="p-5 text-sm text-blue-300 font-mono overflow-x-auto leading-relaxed">{`// Claude / LLM agent calls:
+const result = await tools.nastar_swap_quote({
+  from: "USDm",
+  to: "EURm",
+  amount: "80"  // after Nastar 20% fee
+});
+
+// Returns:
+{
+  "tokenIn": { "symbol": "USDm", "flag": "🇺🇸" },
+  "tokenOut": { "symbol": "EURm", "flag": "🇪🇺" },
+  "amountIn": "80",
+  "expectedAmountOut": "73.614",
+  "exchangeRate": "0.920175",
+  "priceImpact": "< 0.1%"
+}`}</pre>
+            </div>
+
+            {/* Templates that use swap */}
+            <div className="rounded-xl border border-white/10 p-5">
+              <h3 className="font-semibold mb-4 text-[#A1A1A1] text-xs uppercase tracking-wider">Templates with auto-swap built-in</h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {[
+                  { name: "Remittance", desc: "USD → local currency", icon: "💸", pair: "USDm → BRLm" },
+                  { name: "FX Hedge", desc: "Multi-currency rebalance", icon: "📊", pair: "Dynamic" },
+                  { name: "EU Payments", desc: "Pay European sellers", icon: "🇪🇺", pair: "USDm → EURm" },
+                  { name: "Africa Agent", desc: "CFA franc settlements", icon: "🌍", pair: "USDm → XOFm" },
+                ].map(t => (
+                  <div key={t.name} className="rounded-lg bg-white/5 border border-white/10 p-3">
+                    <div className="text-xl mb-1">{t.icon}</div>
+                    <div className="font-semibold text-sm">{t.name}</div>
+                    <div className="text-[#A1A1A1] text-xs mt-0.5">{t.desc}</div>
+                    <div className="text-[#F4C430] text-[10px] font-mono mt-1.5">{t.pair}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── API Reference tab ──────────────────────────────────────────── */}
+        {activeTab === "api" && (
+          <div className="space-y-4">
+            {[
+              {
+                method: "GET",
+                path: "/v1/swap/quote",
+                desc: "Get exchange rate and expected output amount",
+                params: "?from=USDm&to=EURm&amountIn=100",
+                color: "text-green-400 bg-green-400/10 border-green-400/20",
+              },
+              {
+                method: "POST",
+                path: "/v1/swap/build",
+                desc: "Build approval + swap transaction calldata (no execution)",
+                params: '{ "from": "USDm", "to": "EURm", "amountIn": "100", "recipient": "0x..." }',
+                color: "text-blue-400 bg-blue-400/10 border-blue-400/20",
+              },
+              {
+                method: "GET",
+                path: "/v1/swap/pairs",
+                desc: "List all tradable Mento token pairs",
+                params: "",
+                color: "text-green-400 bg-green-400/10 border-green-400/20",
+              },
+              {
+                method: "GET",
+                path: "/v1/oracle/rates",
+                desc: "Full FX rate matrix — Mento on-chain + Pyth real-world",
+                params: "",
+                color: "text-green-400 bg-green-400/10 border-green-400/20",
+              },
+              {
+                method: "GET",
+                path: "/v1/oracle/rates/:from/:to",
+                desc: "Specific pair with divergence alert",
+                params: "/USDm/EURm",
+                color: "text-green-400 bg-green-400/10 border-green-400/20",
+              },
+            ].map(ep => (
+              <div key={ep.path} className="rounded-xl border border-white/10 bg-white/5 overflow-hidden">
+                <div className="flex items-start gap-4 p-4">
+                  <span className={`text-xs font-bold px-2 py-1 rounded border font-mono flex-shrink-0 ${ep.color}`}>{ep.method}</span>
+                  <div className="flex-1 min-w-0">
+                    <code className="text-white font-mono text-sm">{ep.path}</code>
+                    <p className="text-[#A1A1A1] text-xs mt-1">{ep.desc}</p>
+                    {ep.params && (
+                      <code className="text-[#F4C430]/70 text-xs font-mono mt-1 block">{ep.params}</code>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            {/* Live query tester */}
+            <div className="rounded-xl border border-[#F4C430]/20 bg-[#F4C430]/5 overflow-hidden">
+              <div className="px-5 py-3 border-b border-[#F4C430]/10">
+                <span className="text-sm font-medium text-[#F4C430]">Try it — Live Quote</span>
+              </div>
+              <div className="p-5 space-y-4">
+                <div className="flex gap-3 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[#A1A1A1] text-xs">From</span>
+                    <select value={from} onChange={e => setFrom(e.target.value)}
+                      className="px-3 py-1.5 rounded-lg bg-black/30 border border-white/10 text-white text-sm">
+                      {TOKEN_LIST.map(t => <option key={t.symbol} value={t.symbol}>{t.flag} {t.symbol}</option>)}
+                    </select>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[#A1A1A1] text-xs">To</span>
+                    <select value={to} onChange={e => setTo(e.target.value)}
+                      className="px-3 py-1.5 rounded-lg bg-black/30 border border-white/10 text-white text-sm">
+                      {TOKEN_LIST.map(t => <option key={t.symbol} value={t.symbol}>{t.flag} {t.symbol}</option>)}
+                    </select>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[#A1A1A1] text-xs">Amount</span>
+                    <input value={amount} onChange={e => setAmount(e.target.value)}
+                      className="w-24 px-3 py-1.5 rounded-lg bg-black/30 border border-white/10 text-white text-sm font-mono" />
+                  </div>
+                  <button onClick={runQuote} disabled={quoteLoading}
+                    className="px-4 py-1.5 rounded-lg bg-[#F4C430] text-black text-sm font-semibold hover:bg-[#F4C430]/90 disabled:opacity-50 transition">
+                    {quoteLoading ? "Loading..." : "Run →"}
+                  </button>
+                </div>
+                {quoteResult && (
+                  <pre className="text-xs font-mono text-green-300 bg-black/30 rounded-lg p-4 overflow-x-auto max-h-64">
+                    {quoteResult}
+                  </pre>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Live FX Rates tab ──────────────────────────────────────────── */}
+        {activeTab === "rates" && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-4 text-xs text-[#A1A1A1]">
+              <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-green-400 inline-block" /> Mento on-chain (actual swap rate)</span>
+              <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-blue-400 inline-block" /> Pyth real-world (FX reference)</span>
+              <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-yellow-400 inline-block" /> Divergence &gt; 1% = arbitrage signal</span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {usdPairs.map(([key, r]) => {
+                const sym = key.replace("USDm/", "");
+                const token = TOKEN_LIST.find(t => t.symbol === sym);
+                const divergent = (r.divergencePct ?? 0) > 1;
+                return (
+                  <div key={key} className={`rounded-xl border p-4 ${divergent ? "border-yellow-400/30 bg-yellow-400/5" : "border-white/10 bg-white/5"}`}>
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xl">{token?.flag}</span>
+                        <span className="font-bold">{key}</span>
+                      </div>
+                      {divergent && (
+                        <span className="text-yellow-400 text-xs px-2 py-0.5 rounded-full bg-yellow-400/10 border border-yellow-400/20">
+                          ⚠ {r.divergencePct?.toFixed(2)}% divergence
+                        </span>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <div className="text-[#A1A1A1] text-xs mb-1 flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-green-400" /> Mento on-chain
+                        </div>
+                        <div className="font-mono font-bold text-lg text-white">
+                          {r.onchain ? r.onchain.toFixed(4) : <span className="text-white/20 text-sm">no pool</span>}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-[#A1A1A1] text-xs mb-1 flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-blue-400" /> Pyth real-world
+                        </div>
+                        <div className="font-mono font-bold text-lg text-white">
+                          {r.pyth ? r.pyth.toFixed(4) : <span className="text-white/20 text-sm">no feed</span>}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mt-2 text-[10px] text-[#A1A1A1]">
+                      Source: {r.onchain && r.pyth ? "mento + pyth" : r.onchain ? "mento only" : r.pyth ? "pyth only" : "unavailable"}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="p-4 rounded-xl bg-white/5 border border-white/10 text-xs text-[#A1A1A1]">
+              <span className="text-white font-medium">Note on testnet:</span> Some Mento pools (BRLm, COPm) may not be deployed on Celo Sepolia testnet.
+              On mainnet all pairs are active. Pyth feeds cover EUR, BRL, XOF. COP uses Mento on-chain only.
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

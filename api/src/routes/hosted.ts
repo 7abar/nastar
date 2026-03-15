@@ -40,7 +40,7 @@ router.post("/", async (req: Request, res: Response) => {
   const {
     agentWallet, ownerAddress, apiKey, agentNftId, serviceId,
     name, description, templateId, systemPrompt,
-    llmProvider, llmModel, llmApiKey, spendingLimits,
+    llmProvider, llmModel, llmApiKey, spendingLimits, autoSwap,
   } = req.body;
 
   if (!agentWallet || !systemPrompt || !llmApiKey) {
@@ -64,6 +64,14 @@ router.post("/", async (req: Request, res: Response) => {
       dailyLimitUsd: spendingLimits?.dailyLimitUsd ?? 50,
       requireConfirmAboveUsd: spendingLimits?.requireConfirmAboveUsd ?? 25,
     },
+    // Auto-swap config: agent auto-converts payout to preferred currency via Mento
+    auto_swap: autoSwap ? {
+      enabled: autoSwap.enabled ?? true,
+      targetToken: autoSwap.targetToken,       // e.g. "EURm"
+      targetAddress: autoSwap.targetAddress,   // ERC-20 address on Celo
+      slippageTolerance: autoSwap.slippageTolerance ?? 0.5,
+      triggerOnDealComplete: autoSwap.triggerOnDealComplete ?? true,
+    } : null,
     status: "active",
     daily_spend: 0,
     daily_spend_reset: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
@@ -206,5 +214,71 @@ async function callLLM(agent: any, userMessage: string): Promise<string> {
 
   throw new Error(`Unsupported LLM provider: ${llm_provider}`);
 }
+
+// ─── POST /v1/hosted/:wallet/auto-swap — agent-triggered currency conversion ──
+// Called automatically after deal payout, or manually by the agent
+router.post("/:wallet/auto-swap", async (req: Request, res: Response) => {
+  const wallet = req.params.wallet.toLowerCase();
+  const agent = await dbGet<any>("hosted_agents", { agent_wallet: wallet });
+  if (!agent) return res.status(404).json({ error: "Agent not found" });
+
+  const { fromToken, fromAddress, amount, recipient } = req.body;
+  const swapConfig = agent.auto_swap;
+
+  if (!swapConfig?.enabled) {
+    return res.status(400).json({ error: "Auto-swap not configured for this agent" });
+  }
+
+  const targetAddress = swapConfig.targetAddress;
+  const recipientAddr = recipient || agent.owner_address;
+
+  if (!fromAddress || !amount || !recipientAddr) {
+    return res.status(400).json({ error: "fromAddress, amount, recipient required" });
+  }
+
+  // Get swap calldata from Mento via internal call
+  try {
+    const API_BASE = process.env.API_URL || "http://localhost:3001";
+    const buildRes = await fetch(`${API_BASE}/v1/swap/build`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        tokenIn: fromAddress,
+        tokenOut: targetAddress,
+        amountIn: amount,
+        recipient: recipientAddr,
+        slippageTolerance: swapConfig.slippageTolerance ?? 0.5,
+        deadlineMinutes: 10,
+      }),
+    });
+
+    if (!buildRes.ok) {
+      const err = await buildRes.json() as any;
+      return res.status(400).json({ error: `Swap build failed: ${err.error}` });
+    }
+
+    const swapData = await buildRes.json() as any;
+
+    await addLog(wallet, {
+      type: "swap",
+      message: `Auto-swap queued: ${amount} ${fromToken} → ${swapConfig.targetToken} (expected ${swapData.expectedAmountOut} ${swapConfig.targetToken})`,
+      amount: String(amount),
+    });
+
+    return res.json({
+      status: "swap_built",
+      agentWallet: wallet,
+      fromToken,
+      toToken: swapConfig.targetToken,
+      amountIn: amount,
+      expectedAmountOut: swapData.expectedAmountOut,
+      minAmountOut: swapData.minAmountOut,
+      transactions: swapData.transactions, // Caller executes these
+      note: "Execute transactions in order to complete the swap",
+    });
+  } catch (err) {
+    return res.status(500).json({ error: (err as Error).message });
+  }
+});
 
 export default router;
