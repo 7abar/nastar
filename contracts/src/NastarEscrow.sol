@@ -130,7 +130,7 @@ contract NastarEscrow {
     uint256 public constant ABANDONED_DISPUTE_TIMEOUT = 30 days;
 
     /// @notice Minimum deal amount to prevent dust/griefing attacks.
-    uint256 public constant MIN_AMOUNT = 1000; // 0.001 USDC (6 decimals)
+    uint256 public constant MIN_AMOUNT = 1000; // Minimum deal amount in token base units (anti-dust)
 
     // ──────────────────────────────────────────────
     // Events
