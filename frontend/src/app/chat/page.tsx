@@ -215,34 +215,17 @@ function ChatPage() {
     setLoading(false);
   }
 
-  // Suggestions
+  // Suggestions — designed to showcase Nastar's features
   const suggestions = [
-    "I need data about Celo validators",
-    "Find me a smart contract auditor",
-    "Scrape a website for me",
-    "Write a tweet thread about DeFi",
+    { text: "What is Nastar and how does it work?", icon: "💡" },
+    { text: "How does the AI dispute judge resolve conflicts?", icon: "⚖️" },
+    { text: "Show me how escrow protects buyers and sellers", icon: "🔐" },
+    { text: "What stablecoins can I use on Nastar?", icon: "💱" },
+    { text: "How do I launch my own AI agent?", icon: "🚀" },
+    { text: "How is Nastar different from Virtuals ACP?", icon: "🤔" },
   ];
 
-  // Gate: require wallet
-  if (!authenticated) {
-    return (
-      <div className="flex flex-col items-center justify-center h-[calc(100vh-56px)] bg-[#0A0A0A] px-4">
-        <div className="max-w-sm text-center">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#F4C430] to-[#FF9F1C] flex items-center justify-center mx-auto mb-6 shadow-[0_0_30px_rgba(244,196,48,0.3)]">
-            <span className="text-[#0A0A0A] font-bold text-2xl">N</span>
-          </div>
-          <h2 className="text-xl font-bold text-[#F5F5F5] mb-2">Nastar</h2>
-          <p className="text-[#A1A1A1] text-sm mb-8">
-            AI-powered agent discovery. Tell me what you need, I'll find and hire the right agent.
-          </p>
-          <button onClick={login} className="w-full py-3 rounded-xl gradient-btn font-semibold hover:shadow-[0_0_20px_rgba(244,196,48,0.4)] transition text-sm">
-            Connect Wallet to Chat
-          </button>
-          <p className="text-[#A1A1A1]/40 text-xs mt-4">Email, Google, or any Celo wallet</p>
-        </div>
-      </div>
-    );
-  }
+  // No wallet gate — anyone can chat. Hiring requires wallet.
 
   return (
     <div className="flex flex-col h-[calc(100vh-56px)] bg-[#0A0A0A]">
@@ -255,16 +238,20 @@ function ChatPage() {
               <div className="w-20 h-20 rounded-full overflow-hidden mb-4 shadow-[0_0_20px_rgba(244,196,48,0.2)]">
                 <img src="/nastar-mascot.png" alt="Nastar" className="w-full h-full object-cover" />
               </div>
-              <h3 className="text-[#F5F5F5] font-semibold mb-1">What do you need done?</h3>
-              <p className="text-[#A1A1A1] text-sm mb-6">I'll find the right agent and handle the deal.</p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full max-w-md">
+              <h3 className="text-[#F5F5F5] font-semibold text-lg mb-1">Nastar Butler</h3>
+              <p className="text-[#A1A1A1] text-sm mb-2">Your guide to the agent marketplace</p>
+              <p className="text-[#A1A1A1]/40 text-xs mb-8 max-w-sm text-center">
+                Ask about how Nastar works, explore features, or get help hiring AI agents with on-chain escrow.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full max-w-lg">
                 {suggestions.map((s) => (
                   <button
-                    key={s}
-                    onClick={() => { setInput(s); inputRef.current?.focus(); }}
-                    className="px-4 py-2.5 rounded-xl glass-card text-[#A1A1A1] text-sm text-left hover:text-[#F4C430] hover:border-[#F4C430]/50 transition"
+                    key={s.text}
+                    onClick={() => { setInput(s.text); inputRef.current?.focus(); }}
+                    className="flex items-center gap-3 px-4 py-3 rounded-xl bg-white/[0.03] border border-white/[0.06] text-[#A1A1A1] text-sm text-left hover:text-[#F4C430] hover:border-[#F4C430]/30 hover:bg-[#F4C430]/[0.03] transition"
                   >
-                    {s}
+                    <span className="text-base shrink-0">{s.icon}</span>
+                    <span>{s.text}</span>
                   </button>
                 ))}
               </div>
