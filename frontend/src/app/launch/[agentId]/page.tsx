@@ -5,6 +5,7 @@ import { useState, useEffect, use } from "react";
 import { usePrivy } from "@privy-io/react-auth";
 import Link from "next/link";
 import { getStoredAgents, type RegisteredAgent } from "@/lib/agents-api";
+import { supabase } from "@/lib/supabase";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://api-production-a473.up.railway.app";
 
@@ -35,19 +36,90 @@ export default function AgentDashboardPage({ params }: { params: Promise<{ agent
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const stored = getStoredAgents();
-    const found = stored.find(
-      (a) => a.agentWallet.toLowerCase() === agentId.toLowerCase()
-    );
-    setAgent(found || null);
-    setLoading(false);
+    async function loadAgent() {
+      // Try localStorage first
+      const stored = getStoredAgents();
+      let found = stored.find(
+        (a) => a.agentWallet.toLowerCase() === agentId.toLowerCase()
+      );
 
-    // Fetch live stats + logs from API
-    if (found) {
-      fetchStats(found);
-      const interval = setInterval(() => fetchStats(found), 15_000);
-      return () => clearInterval(interval);
+      // Fallback: query Supabase
+      if (!found) {
+        try {
+          const { data } = await supabase
+            .from("registered_agents")
+            .select("*")
+            .ilike("agent_wallet", agentId)
+            .single();
+          if (data) {
+            found = {
+              id: data.id,
+              name: data.name,
+              description: data.description,
+              ownerAddress: data.owner_address,
+              agentWallet: data.agent_wallet,
+              agentPrivateKey: "",
+              apiKey: data.api_key,
+              apiKeyActive: data.api_key_active,
+              agentNftId: data.agent_nft_id,
+              serviceId: data.service_id,
+              endpoint: data.endpoint,
+              tags: data.tags || [],
+              pricePerCall: data.price_per_call,
+              paymentToken: data.payment_token,
+              avatar: data.avatar,
+              createdAt: data.created_at,
+            };
+          }
+        } catch {}
+      }
+
+      // Fallback: query hosted_agents
+      if (!found) {
+        try {
+          const { data } = await supabase
+            .from("hosted_agents")
+            .select("*")
+            .ilike("agent_wallet", agentId)
+            .single();
+          if (data) {
+            found = {
+              id: data.agent_wallet,
+              name: data.name,
+              description: data.description || "",
+              ownerAddress: data.owner_address || "",
+              agentWallet: data.agent_wallet,
+              agentPrivateKey: "",
+              apiKey: data.api_key,
+              apiKeyActive: true,
+              agentNftId: data.agent_nft_id,
+              serviceId: data.service_id,
+              endpoint: `/v1/hosted/${data.agent_wallet}`,
+              tags: [],
+              pricePerCall: "0",
+              paymentToken: "",
+              avatar: null,
+              createdAt: new Date(data.created_at).getTime(),
+            };
+          }
+        } catch {}
+      }
+
+      setAgent(found || null);
+      setLoading(false);
+
+      if (found) {
+        fetchStats(found);
+      }
     }
+
+    loadAgent();
+
+    // Poll stats
+    const interval = setInterval(() => {
+      if (agent) fetchStats(agent);
+    }, 15_000);
+    return () => clearInterval(interval);
   }, [agentId]);
 
   async function fetchStats(a: RegisteredAgent) {
@@ -167,19 +239,13 @@ export default function AgentDashboardPage({ params }: { params: Promise<{ agent
           ))}
         </div>
 
-        {/* Daily spend bar */}
+        {/* Status bar */}
         <div className="p-5 rounded-xl bg-white/5 border border-white/10 mb-6">
-          <div className="flex justify-between items-center mb-2">
-            <span className="text-sm font-medium">Daily Spending</span>
-            <span className="text-sm text-[#A1A1A1]">
-              ${stats?.dailySpend ?? "0"} / ${stats?.dailyLimit ?? agent.pricePerCall}
+          <div className="flex justify-between items-center">
+            <span className="text-sm font-medium">Agent Status</span>
+            <span className={`text-sm font-medium ${stats?.status === "active" ? "text-green-400" : "text-yellow-400"}`}>
+              {stats?.status === "active" ? "Active" : stats?.status || "Active"}
             </span>
-          </div>
-          <div className="w-full h-2 rounded-full bg-white/10">
-            <div
-              className={`h-2 rounded-full transition-all ${dailySpendPct > 80 ? "bg-red-400" : dailySpendPct > 50 ? "bg-yellow-400" : "bg-green-400"}`}
-              style={{ width: `${dailySpendPct}%` }}
-            />
           </div>
           <p className="text-[#A1A1A1]/50 text-xs mt-2">
             Agent pauses automatically when daily limit is reached.
