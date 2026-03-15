@@ -4,11 +4,16 @@ export const dynamic = "force-dynamic";
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { getLeaderboard, getStats, type LeaderboardEntry, type Stats } from "@/lib/api";
+import { supabase } from "@/lib/supabase";
 
 export default function LeaderboardPage() {
   const [agents, setAgents] = useState<LeaderboardEntry[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
+  const [avatars, setAvatars] = useState<Map<number, string>>(new Map());
+  const [reputations, setReputations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://api-production-a473.up.railway.app";
 
   useEffect(() => {
     async function load() {
@@ -17,6 +22,27 @@ export default function LeaderboardPage() {
         setAgents(lb);
         setStats(s);
       } catch (err) { console.error(err); }
+
+      // Fetch avatars from Supabase
+      try {
+        const { data } = await supabase
+          .from("registered_agents")
+          .select("agent_nft_id, name, avatar");
+        if (data) {
+          const map = new Map<number, string>();
+          for (const a of data) {
+            if (a.agent_nft_id && a.avatar) map.set(a.agent_nft_id, a.avatar);
+          }
+          setAvatars(map);
+        }
+      } catch {}
+
+      // Fetch reputation scores
+      try {
+        const res = await fetch(`${API_URL}/v1/reputation/leaderboard`);
+        if (res.ok) setReputations(await res.json());
+      } catch {}
+
       setLoading(false);
     }
     load();
@@ -71,7 +97,10 @@ export default function LeaderboardPage() {
             </div>
 
             <div className="space-y-2">
-              {agents.map((agent, idx) => (
+              {agents.map((agent, idx) => {
+                const avatar = avatars.get(agent.agentId);
+                const rep = reputations.find((r: any) => r.agentId === agent.agentId);
+                return (
                 <Link
                   key={agent.agentId}
                   href={`/agents/${agent.agentId}`}
@@ -87,13 +116,20 @@ export default function LeaderboardPage() {
                     </span>
                   </div>
                   <div className="col-span-5 md:col-span-4 flex items-center gap-3">
-                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-sm shrink-0 ${
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-sm shrink-0 overflow-hidden ${
                       idx === 0 ? "bg-[#F4C430]/20 text-[#F4C430]" : "bg-white/[0.06] text-[#A1A1A1]"
                     }`}>
-                      {agent.name.charAt(0).toUpperCase()}
+                      {avatar && avatar.startsWith("http") ? (
+                        <img src={avatar} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        agent.name.charAt(0).toUpperCase()
+                      )}
                     </div>
                     <div className="min-w-0">
-                      <p className="text-[#F5F5F5] font-medium text-sm group-hover:text-[#F4C430] transition truncate">{agent.name}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-[#F5F5F5] font-medium text-sm group-hover:text-[#F4C430] transition truncate">{agent.name}</p>
+                        {rep && <span className="text-[#F4C430] text-[10px] font-medium">{rep.score}</span>}
+                      </div>
                       <p className="text-[#A1A1A1]/30 text-[10px] font-mono">{agent.address.slice(0, 6)}...{agent.address.slice(-4)}</p>
                     </div>
                   </div>
@@ -114,7 +150,8 @@ export default function LeaderboardPage() {
                     </svg>
                   </div>
                 </Link>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}

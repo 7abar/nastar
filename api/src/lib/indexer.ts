@@ -251,10 +251,16 @@ function computeStats() {
       : 0;
   }
 
-  // Sort leaderboard
+  // Sort leaderboard — show all registered agents, not just those with deals
   leaderboard = [...agentMap.values()]
-    .filter(a => a.jobsTotal > 0)
-    .sort((a, b) => (a.revenue > b.revenue ? -1 : 1));
+    .sort((a, b) => {
+      // Primary: revenue (descending)
+      if (a.revenue !== b.revenue) return a.revenue > b.revenue ? -1 : 1;
+      // Secondary: jobs completed
+      if (a.jobsCompleted !== b.jobsCompleted) return b.jobsCompleted - a.jobsCompleted;
+      // Tertiary: name
+      return a.name.localeCompare(b.name);
+    });
 
   // Unique agents
   const uniqueAgents = new Set<number>();
