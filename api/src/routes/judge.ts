@@ -1,24 +1,19 @@
 /**
  * /v1/judge — AI Dispute Judge
- *
- * POST /v1/judge/:dealId/request   — buyer or seller submits evidence + requests AI verdict
- * GET  /v1/judge/:dealId           — get current verdict status
- * POST /v1/judge/:dealId/execute   — execute verdict on-chain (called automatically after verdict)
+ * Persisted in Supabase (judge_cases + judge_evidence tables).
  */
 
 import { Router, Request, Response } from "express";
-import { createWalletClient, createPublicClient, http, encodeFunctionData } from "viem";
+import { createWalletClient, createPublicClient, http } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { defineChain } from "viem";
+import { db, dbGet, dbUpsert, dbUpdate } from "../lib/supabase.js";
 
 const router = Router();
-
-// ─── Celo Sepolia ─────────────────────────────────────────────────────────────
 
 const celoSepolia = defineChain({
   id: 11142220,
   name: "Celo Sepolia",
-  network: "celo-sepolia",
   nativeCurrency: { name: "CELO", symbol: "CELO", decimals: 18 },
   rpcUrls: { default: { http: ["https://forno.celo-sepolia.celo-testnet.org"] } },
 });
@@ -26,69 +21,42 @@ const celoSepolia = defineChain({
 const ESCROW_ADDRESS = (process.env.NASTAR_ESCROW || "0xAE17AaccD135BD434E13990Dd2fAAA743f32b1e1") as `0x${string}`;
 
 const RESOLVE_ABI = [{
-  type: "function",
-  name: "resolveDisputeWithJudge",
-  inputs: [
-    { name: "dealId", type: "uint256" },
-    { name: "sellerBps", type: "uint256" },
-    { name: "reasoning", type: "string" },
-  ],
-  outputs: [],
-  stateMutability: "nonpayable",
+  type: "function", name: "resolveDisputeWithJudge",
+  inputs: [{ name: "dealId", type: "uint256" }, { name: "sellerBps", type: "uint256" }, { name: "reasoning", type: "string" }],
+  outputs: [], stateMutability: "nonpayable",
 }] as const;
 
 const GET_DEAL_ABI = [{
-  type: "function",
-  name: "getDeal",
+  type: "function", name: "getDeal",
   inputs: [{ name: "dealId", type: "uint256" }],
-  outputs: [{
-    type: "tuple",
-    components: [
-      { name: "dealId", type: "uint256" }, { name: "serviceId", type: "uint256" },
-      { name: "buyerAgentId", type: "uint256" }, { name: "sellerAgentId", type: "uint256" },
-      { name: "buyer", type: "address" }, { name: "seller", type: "address" },
-      { name: "paymentToken", type: "address" }, { name: "amount", type: "uint256" },
-      { name: "taskDescription", type: "string" }, { name: "deliveryProof", type: "string" },
-      { name: "status", type: "uint8" }, { name: "createdAt", type: "uint256" },
-      { name: "deadline", type: "uint256" }, { name: "completedAt", type: "uint256" },
-      { name: "disputedAt", type: "uint256" },
-    ],
-  }],
+  outputs: [{ type: "tuple", components: [
+    { name: "dealId", type: "uint256" }, { name: "serviceId", type: "uint256" },
+    { name: "buyerAgentId", type: "uint256" }, { name: "sellerAgentId", type: "uint256" },
+    { name: "buyer", type: "address" }, { name: "seller", type: "address" },
+    { name: "paymentToken", type: "address" }, { name: "amount", type: "uint256" },
+    { name: "taskDescription", type: "string" }, { name: "deliveryProof", type: "string" },
+    { name: "status", type: "uint8" }, { name: "createdAt", type: "uint256" },
+    { name: "deadline", type: "uint256" }, { name: "completedAt", type: "uint256" },
+    { name: "disputedAt", type: "uint256" },
+  ]}],
   stateMutability: "view",
 }] as const;
 
-// ─── In-memory verdict store ───────────────────────────────────────────────────
-
-interface Evidence {
-  role: "buyer" | "seller";
-  text: string;
-  submittedAt: number;
-}
-
-interface JudgeCase {
-  dealId: string;
-  evidence: Evidence[];
-  verdict?: {
-    sellerBps: number;
-    reasoning: string;
-    summary: string;
-    confidence: number;
-    generatedAt: number;
-    txHash?: string;
-    executed: boolean;
-  };
-  status: "open" | "deliberating" | "decided" | "executed";
-  requestedAt: number;
-}
-
-const cases = new Map<string, JudgeCase>();
-
 // ─── GET /v1/judge/:dealId ─────────────────────────────────────────────────────
 
-router.get("/:dealId", (req: Request, res: Response) => {
-  const c = cases.get(req.params.dealId);
+router.get("/:dealId", async (req: Request, res: Response) => {
+  const c = await dbGet<any>("judge_cases", { deal_id: req.params.dealId });
   if (!c) return res.status(404).json({ error: "No judge case found for this deal" });
-  return res.json(c);
+
+  const { data: evidence } = await db.from("judge_evidence").select("*").eq("deal_id", req.params.dealId);
+
+  return res.json({
+    dealId: c.deal_id,
+    status: c.status,
+    verdict: c.verdict,
+    evidence: (evidence || []).map((e: any) => ({ role: e.role, text: e.evidence_text, submittedAt: new Date(e.submitted_at).getTime() })),
+    requestedAt: new Date(c.requested_at).getTime(),
+  });
 });
 
 // ─── POST /v1/judge/:dealId/request ───────────────────────────────────────────
@@ -97,213 +65,133 @@ router.post("/:dealId/request", async (req: Request, res: Response) => {
   const { dealId } = req.params;
   const { role, evidence: evidenceText } = req.body;
 
-  if (!role || !evidenceText) {
-    return res.status(400).json({ error: "Missing role (buyer|seller) or evidence text" });
-  }
+  if (!role || !evidenceText) return res.status(400).json({ error: "Missing role or evidence" });
 
   // Init case if not exists
-  if (!cases.has(dealId)) {
-    cases.set(dealId, {
-      dealId,
-      evidence: [],
-      status: "open",
-      requestedAt: Date.now(),
-    });
+  const existing = await dbGet<any>("judge_cases", { deal_id: dealId });
+  if (!existing) {
+    await dbUpsert("judge_cases", { deal_id: dealId, status: "open" }, "deal_id");
+  } else if (existing.status === "decided" || existing.status === "executed") {
+    return res.status(409).json({ error: "Verdict already issued", verdict: existing.verdict });
   }
 
-  const c = cases.get(dealId)!;
-  if (c.status === "decided" || c.status === "executed") {
-    return res.status(409).json({ error: "Verdict already issued", verdict: c.verdict });
-  }
-
-  // Add evidence
-  c.evidence = c.evidence.filter((e) => e.role !== role); // replace if re-submitted
-  c.evidence.push({ role: role as "buyer" | "seller", text: evidenceText, submittedAt: Date.now() });
+  // Upsert evidence
+  const { error: evErr } = await db.from("judge_evidence")
+    .upsert({ deal_id: dealId, role, evidence_text: evidenceText }, { onConflict: "deal_id,role" });
+  if (evErr) return res.status(500).json({ error: evErr.message });
 
   // Fetch deal from chain
   let deal: any;
   try {
     const publicClient = createPublicClient({ chain: celoSepolia, transport: http() });
-    deal = await publicClient.readContract({
-      address: ESCROW_ADDRESS,
-      abi: GET_DEAL_ABI,
-      functionName: "getDeal",
-      args: [BigInt(dealId)],
-    });
-  } catch (err) {
-    return res.status(500).json({ error: "Failed to fetch deal from chain" });
-  }
+    deal = await publicClient.readContract({ address: ESCROW_ADDRESS, abi: GET_DEAL_ABI, functionName: "getDeal", args: [BigInt(dealId)] });
+  } catch { return res.status(500).json({ error: "Failed to fetch deal from chain" }); }
 
-  // STATUS 4 = Disputed
-  if (Number(deal.status) !== 4) {
-    return res.status(400).json({ error: "Deal is not in Disputed status", status: deal.status });
-  }
+  if (Number(deal.status) !== 4) return res.status(400).json({ error: "Deal is not Disputed", status: deal.status });
 
-  // If both parties submitted evidence, trigger AI verdict
-  const hasBoth = c.evidence.some((e) => e.role === "buyer") && c.evidence.some((e) => e.role === "seller");
-
-  // Also allow single-party verdict after 1 hour (no response = weaker case)
-  const elapsed = Date.now() - c.requestedAt;
-  const singlePartyOk = elapsed > 60 * 60 * 1000; // 1 hour
+  // Check if both sides submitted
+  const { data: allEvidence } = await db.from("judge_evidence").select("role").eq("deal_id", dealId);
+  const roles = (allEvidence || []).map((e: any) => e.role);
+  const hasBoth = roles.includes("buyer") && roles.includes("seller");
+  const caseRow = await dbGet<any>("judge_cases", { deal_id: dealId });
+  const elapsed = Date.now() - new Date(caseRow?.requested_at || Date.now()).getTime();
+  const singlePartyOk = elapsed > 60 * 60 * 1000;
 
   if (hasBoth || singlePartyOk) {
-    c.status = "deliberating";
-    // Run async — don't block response
-    runJudge(c, deal).catch(console.error);
+    await dbUpdate("judge_cases", { deal_id: dealId }, { status: "deliberating" });
+    runJudge(dealId, deal).catch(console.error);
   }
 
   return res.json({
-    status: c.status,
-    evidenceReceived: c.evidence.map((e) => e.role),
-    message: hasBoth
-      ? "Both parties submitted. AI judge is deliberating..."
-      : "Evidence received. Waiting for other party (or 1-hour timeout).",
+    status: hasBoth || singlePartyOk ? "deliberating" : "open",
+    evidenceReceived: roles,
+    message: hasBoth ? "Both parties submitted. AI judge deliberating..." : "Evidence received. Waiting for other party.",
   });
 });
 
 // ─── AI Judge Logic ───────────────────────────────────────────────────────────
 
-async function runJudge(c: JudgeCase, deal: any): Promise<void> {
-  try {
-    const buyerEvidence = c.evidence.find((e) => e.role === "buyer")?.text || "(no evidence submitted)";
-    const sellerEvidence = c.evidence.find((e) => e.role === "seller")?.text || "(no evidence submitted)";
+async function runJudge(dealId: string, deal: any): Promise<void> {
+  const { data: evidence } = await db.from("judge_evidence").select("*").eq("deal_id", dealId);
+  const buyerEv = evidence?.find((e: any) => e.role === "buyer")?.evidence_text || "(no evidence submitted)";
+  const sellerEv = evidence?.find((e: any) => e.role === "seller")?.evidence_text || "(no evidence submitted)";
+  const amountUsdc = (Number(deal.amount) / 1e6).toFixed(2);
 
-    const amountUsdc = (Number(deal.amount) / 1e6).toFixed(2);
+  const systemPrompt = `You are an impartial AI arbitrator for Nastar, a trustless agent marketplace on Celo. Output ONLY valid JSON.`;
+  const userPrompt = `DISPUTE #${dealId}
+AMOUNT: $${amountUsdc} USDC
+TASK: ${deal.taskDescription}
+DELIVERY PROOF: ${deal.deliveryProof || "(none)"}
 
-    const systemPrompt = `You are an impartial AI arbitrator for Nastar, a trustless AI agent marketplace on Celo.
-Your job is to resolve payment disputes between buyers and sellers of AI agent services.
-You must be fair, consistent, and base decisions solely on the evidence provided.
-Output ONLY valid JSON. No markdown, no explanation outside the JSON.`;
+BUYER: ${buyerEv}
+SELLER: ${sellerEv}
 
-    const userPrompt = `DISPUTE CASE #${c.dealId}
-
-DEAL AMOUNT: $${amountUsdc} USDC
-TASK DESCRIPTION: ${deal.taskDescription}
-DELIVERY PROOF: ${deal.deliveryProof || "(none provided)"}
-
-BUYER'S EVIDENCE (claims delivery was unsatisfactory):
-${buyerEvidence}
-
-SELLER'S EVIDENCE (claims delivery was completed):
-${sellerEvidence}
-
-Analyze this dispute and return a JSON verdict:
+Return JSON:
 {
-  "sellerBps": <integer 0-10000, basis points awarded to seller>,
-  "reasoning": "<detailed reasoning, max 200 chars, stored on-chain>",
-  "summary": "<1-2 sentence human-readable verdict>",
-  "confidence": <integer 0-100, your confidence in this verdict>
+  "sellerBps": <0-10000>,
+  "reasoning": "<max 200 chars, stored on-chain>",
+  "summary": "<1-2 sentence verdict>",
+  "confidence": <0-100>
 }
 
-Guidelines:
-- sellerBps 10000 = seller wins fully (delivery meets requirements)
-- sellerBps 0 = buyer wins fully (delivery completely missing or fraudulent)
-- sellerBps 5000-8000 = partial delivery (good faith effort but incomplete)
-- If seller provided no delivery proof, lean toward buyer
-- If buyer provided no specific complaints, lean toward seller
-- Consider the task complexity vs delivery proof quality`;
+10000 = seller wins fully. 0 = buyer wins. 5000 = 50/50.`;
 
+  try {
     const apiKey = process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY;
     const useAnthropic = !process.env.OPENAI_API_KEY && !!process.env.ANTHROPIC_API_KEY;
-
     let raw: string;
 
     if (useAnthropic) {
       const res = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
-        headers: {
-          "x-api-key": apiKey!,
-          "anthropic-version": "2023-06-01",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "claude-haiku-3-5",
-          max_tokens: 512,
-          system: systemPrompt,
-          messages: [{ role: "user", content: userPrompt }],
-        }),
+        headers: { "x-api-key": apiKey!, "anthropic-version": "2023-06-01", "Content-Type": "application/json" },
+        body: JSON.stringify({ model: "claude-haiku-3-5", max_tokens: 512, system: systemPrompt, messages: [{ role: "user", content: userPrompt }] }),
       });
       const data = await res.json() as any;
       raw = data.content[0]?.text || "{}";
     } else {
       const res = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
-        headers: {
-          "Authorization": `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "gpt-4o-mini",
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userPrompt },
-          ],
-          max_tokens: 512,
-          response_format: { type: "json_object" },
-        }),
+        headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ model: "gpt-4o-mini", messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }], max_tokens: 512, response_format: { type: "json_object" } }),
       });
       const data = await res.json() as any;
       raw = data.choices[0]?.message?.content || "{}";
     }
 
-    const verdict = JSON.parse(raw);
-    const sellerBps = Math.max(0, Math.min(10000, parseInt(verdict.sellerBps)));
-
-    c.verdict = {
-      sellerBps,
-      reasoning: (verdict.reasoning || "AI judge verdict").slice(0, 200),
-      summary: verdict.summary || "Verdict issued.",
-      confidence: verdict.confidence || 80,
-      generatedAt: Date.now(),
-      executed: false,
+    const v = JSON.parse(raw);
+    const sellerBps = Math.max(0, Math.min(10000, parseInt(v.sellerBps)));
+    const verdict = {
+      sellerBps, reasoning: (v.reasoning || "AI verdict").slice(0, 200),
+      summary: v.summary || "Verdict issued.", confidence: v.confidence || 80,
+      generatedAt: Date.now(), executed: false,
     };
-    c.status = "decided";
 
-    // Auto-execute on-chain
-    await executeVerdict(c);
+    await dbUpdate("judge_cases", { deal_id: dealId }, { status: "decided", verdict });
+    await executeVerdict(dealId, verdict);
   } catch (err) {
-    console.error("Judge error:", err);
-    // Fallback: 50/50
-    c.verdict = {
-      sellerBps: 5000,
-      reasoning: "AI unavailable. Defaulting to 50/50 split.",
-      summary: "AI judge unavailable. Funds split equally.",
-      confidence: 0,
-      generatedAt: Date.now(),
-      executed: false,
-    };
-    c.status = "decided";
-    await executeVerdict(c);
+    const fallback = { sellerBps: 5000, reasoning: "AI unavailable. Default 50/50.", summary: "Funds split equally.", confidence: 0, generatedAt: Date.now(), executed: false };
+    await dbUpdate("judge_cases", { deal_id: dealId }, { status: "decided", verdict: fallback });
+    await executeVerdict(dealId, fallback);
   }
 }
 
-async function executeVerdict(c: JudgeCase): Promise<void> {
-  if (!c.verdict || c.verdict.executed) return;
-
+async function executeVerdict(dealId: string, verdict: any): Promise<void> {
   const judgeKey = process.env.JUDGE_PRIVATE_KEY || process.env.PRIVATE_KEY;
-  if (!judgeKey) {
-    console.error("No JUDGE_PRIVATE_KEY set — verdict decided but not executed on-chain");
-    return;
-  }
-
+  if (!judgeKey) return;
   try {
     const account = privateKeyToAccount(judgeKey as `0x${string}`);
     const walletClient = createWalletClient({ account, chain: celoSepolia, transport: http() });
-
     const hash = await walletClient.writeContract({
-      address: ESCROW_ADDRESS,
-      abi: RESOLVE_ABI,
-      functionName: "resolveDisputeWithJudge",
-      args: [BigInt(c.dealId), BigInt(c.verdict.sellerBps), c.verdict.reasoning],
+      address: ESCROW_ADDRESS, abi: RESOLVE_ABI, functionName: "resolveDisputeWithJudge",
+      args: [BigInt(dealId), BigInt(verdict.sellerBps), verdict.reasoning],
     });
-
-    c.verdict.txHash = hash;
-    c.verdict.executed = true;
-    c.status = "executed";
-    console.log(`[Judge] Deal #${c.dealId} resolved. TX: ${hash}. sellerBps: ${c.verdict.sellerBps}`);
-  } catch (err) {
-    console.error("On-chain execution failed:", err);
-  }
+    await dbUpdate("judge_cases", { deal_id: dealId }, {
+      status: "executed",
+      verdict: { ...verdict, txHash: hash, executed: true },
+    });
+    console.log(`[Judge] Deal #${dealId} resolved. TX: ${hash}`);
+  } catch (err) { console.error("On-chain execution failed:", err); }
 }
 
 export default router;

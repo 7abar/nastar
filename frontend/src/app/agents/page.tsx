@@ -4,7 +4,7 @@ export const dynamic = "force-dynamic";
 import { useState, useEffect } from "react";
 import { usePrivy } from "@privy-io/react-auth";
 import Link from "next/link";
-import { getStoredAgents, type RegisteredAgent } from "@/lib/agents-api";
+import { getStoredAgents, getStoredAgentsByOwner, type RegisteredAgent } from "@/lib/agents-api";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://api-production-a473.up.railway.app";
 
@@ -42,7 +42,11 @@ export default function AgentsPage() {
         const leaderboard = await lbRes.json();
         const lbMap = new Map<number, any>();
         leaderboard.forEach((a: any) => lbMap.set(a.agentId, a));
-        const localAgents = getStoredAgents();
+        // Fetch from Supabase if user is connected, else local
+        const ownerAddr2 = user?.wallet?.address || "";
+        const localAgents = ownerAddr2
+          ? await getStoredAgentsByOwner(ownerAddr2)
+          : getStoredAgents();
         const localMap = new Map<string, RegisteredAgent>();
         localAgents.forEach((a) => localMap.set(a.agentWallet.toLowerCase(), a));
         const ownerAddr = user?.wallet?.address?.toLowerCase() || "";
