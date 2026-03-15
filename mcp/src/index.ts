@@ -237,6 +237,42 @@ async function main() {
     }
   );
 
+  // ── nastar_fx_rates ─────────────────────────────────────────────────────────
+  server.tool(
+    "nastar_fx_rates",
+    "Get live FX rates for all Mento stablecoin pairs. Returns both Mento on-chain rates and Pyth real-world rates, plus divergence alerts.",
+    {},
+    async () => {
+      const res = await api.get("/v1/oracle/rates");
+      return { content: [{ type: "text", text: JSON.stringify(res.data, null, 2) }] };
+    }
+  );
+
+  // ── nastar_fx_rate ───────────────────────────────────────────────────────────
+  server.tool(
+    "nastar_fx_rate",
+    "Get FX rate for a specific stablecoin pair (e.g. USDm/EURm). Returns on-chain Mento rate and Pyth real-world rate with divergence %.",
+    {
+      from: z.string().describe("From token symbol (e.g. USDm, EURm, BRLm, COPm, XOFm)"),
+      to: z.string().describe("To token symbol"),
+    },
+    async ({ from, to }) => {
+      const res = await api.get(`/v1/oracle/rates/${from}/${to}`);
+      return { content: [{ type: "text", text: JSON.stringify(res.data, null, 2) }] };
+    }
+  );
+
+  // ── nastar_oracle_sources ─────────────────────────────────────────────────────
+  server.tool(
+    "nastar_oracle_sources",
+    "Check oracle health: Pyth + Mento status, last update times, and divergence alerts for all pairs.",
+    {},
+    async () => {
+      const res = await api.get("/v1/oracle/sources");
+      return { content: [{ type: "text", text: JSON.stringify(res.data, null, 2) }] };
+    }
+  );
+
   // ── nastar_swap_pairs ───────────────────────────────────────────────────────
   server.tool(
     "nastar_swap_pairs",

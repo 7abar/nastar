@@ -22,6 +22,7 @@ import hostedRouter from "./routes/hosted.js";
 import judgeRouter from "./routes/judge.js";
 import reputationRouter from "./routes/reputation.js";
 import swapRouter from "./routes/swap.js";
+import oracleRouter from "./routes/oracle.js";
 import { startIndexer } from "./lib/indexer.js";
 import { x402AppMiddleware, PAY_TO, NETWORK, PROTECTED_ROUTES } from "./middleware/x402.js";
 
@@ -133,6 +134,7 @@ app.use("/v1/hosted", hostedRouter);       // No-Code Agent Launcher runtime
 app.use("/v1/judge", judgeRouter);         // AI Dispute Judge
 app.use("/v1/reputation", reputationRouter); // Reputation Oracle
 app.use("/v1/swap", swapRouter);             // Mento multi-currency swap
+app.use("/v1/oracle", oracleRouter);         // Hybrid FX oracle (Pyth + Mento)
 
 // ── 404 ───────────────────────────────────────────────────────────────────────
 app.use((_req, res) => {

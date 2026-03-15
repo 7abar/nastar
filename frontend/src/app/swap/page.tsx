@@ -7,6 +7,63 @@ import { TOKEN_LIST, type TokenMeta } from "@/lib/contracts";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://api-production-a473.up.railway.app";
 
+// FX Rates Ticker
+function FxTicker() {
+  const [rates, setRates] = useState<Record<string, { onchain: number | null; pyth: number | null; divergencePct: number | null }>>({});
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const res = await fetch(`${API_URL}/v1/oracle/rates`);
+        const data = await res.json();
+        setRates(data.rates || {});
+      } catch {}
+      setLoading(false);
+    }
+    load();
+    const t = setInterval(load, 30000); // refresh every 30s
+    return () => clearInterval(t);
+  }, []);
+
+  // Show only USDm base pairs
+  const usdPairs = Object.entries(rates).filter(([key]) => key.startsWith("USDm/"));
+
+  if (loading) return (
+    <div className="flex gap-6 animate-pulse">
+      {[0,1,2,3].map(i => <div key={i} className="h-4 w-24 bg-white/10 rounded" />)}
+    </div>
+  );
+
+  return (
+    <div className="flex flex-wrap gap-4 text-xs">
+      {usdPairs.map(([key, r]) => {
+        const symbol = key.replace("USDm/", "");
+        const token = TOKEN_LIST.find(t => t.symbol === symbol);
+        const rate = r.onchain ?? r.pyth;
+        const hasDivergence = r.divergencePct !== null && r.divergencePct > 1;
+        return (
+          <div key={key} className="flex items-center gap-1.5">
+            <span>{token?.flag}</span>
+            <span className="text-[#A1A1A1]">{key}</span>
+            <span className={`font-mono font-bold ${hasDivergence ? "text-yellow-400" : "text-white"}`}>
+              {rate ? rate.toFixed(4) : "—"}
+            </span>
+            {hasDivergence && (
+              <span className="text-yellow-400/70" title={`Mento vs Pyth divergence: ${r.divergencePct?.toFixed(2)}%`}>
+                ⚠ {r.divergencePct?.toFixed(1)}%
+              </span>
+            )}
+            {r.onchain && r.pyth && !hasDivergence && (
+              <span className="text-green-400/50 text-[10px]">✓</span>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 interface Quote {
   expectedAmountOut: string;
   exchangeRate: string;
@@ -268,8 +325,20 @@ export default function SwapPage() {
           )}
         </div>
 
+        {/* Live FX Rates ticker */}
+        <div className="mt-4 p-4 rounded-xl bg-white/5 border border-white/10">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-[#A1A1A1] text-xs uppercase tracking-wider">Live FX Rates</p>
+            <div className="flex items-center gap-3 text-[10px] text-[#A1A1A1]/50">
+              <span className="flex items-center gap-1"><span className="text-green-400 text-[8px]">●</span> Mento on-chain</span>
+              <span className="flex items-center gap-1"><span className="text-blue-400 text-[8px]">●</span> Pyth real-world</span>
+            </div>
+          </div>
+          <FxTicker />
+        </div>
+
         {/* Supported tokens */}
-        <div className="mt-6 p-4 rounded-xl bg-white/5 border border-white/10">
+        <div className="mt-4 p-4 rounded-xl bg-white/5 border border-white/10">
           <p className="text-[#A1A1A1] text-xs mb-3 uppercase tracking-wider">Supported tokens</p>
           <div className="grid grid-cols-5 gap-2">
             {TOKEN_LIST.map((t) => (
