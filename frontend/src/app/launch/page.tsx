@@ -456,24 +456,57 @@ export default function LaunchPage() {
 
           {/* Form */}
           <div className="space-y-5">
-            {/* Agent Icon */}
+            {/* Agent Avatar */}
             <div>
-              <label className="text-[#A1A1A1] text-sm mb-2 block">Agent Icon</label>
-              <div className="flex flex-wrap gap-2">
-                {["🤖", "🔍", "🌐", "🛡️", "📊", "⚡", "💬", "🧠", "📝", "🎨", "💰", "🔗"].map((icon) => (
+              <label className="text-[#A1A1A1] text-sm mb-2 block">Agent Avatar</label>
+              <div className="flex items-center gap-4">
+                <div
+                  onClick={() => document.getElementById("agent-avatar-input")?.click()}
+                  className="w-16 h-16 rounded-xl bg-white/[0.04] border-2 border-dashed border-white/[0.15] hover:border-[#F4C430]/50 transition cursor-pointer flex items-center justify-center overflow-hidden group shrink-0"
+                >
+                  {(config as any).avatarPreview ? (
+                    <img src={(config as any).avatarPreview} alt="avatar" className="w-full h-full object-cover rounded-lg" />
+                  ) : (
+                    <div className="text-center">
+                      <svg className="w-6 h-6 text-[#A1A1A1]/30 group-hover:text-[#F4C430] transition mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                      </svg>
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1">
                   <button
-                    key={icon}
                     type="button"
-                    onClick={() => setConfig((c) => ({ ...c, icon }))}
-                    className={`w-11 h-11 rounded-xl flex items-center justify-center text-xl transition ${
-                      (config as any).icon === icon
-                        ? "bg-[#F4C430]/20 border-2 border-[#F4C430] shadow-[0_0_12px_rgba(244,196,48,0.3)]"
-                        : "bg-white/[0.04] border border-white/[0.08] hover:border-[#F4C430]/40"
-                    }`}
+                    onClick={() => document.getElementById("agent-avatar-input")?.click()}
+                    className="px-4 py-2 rounded-lg border border-white/10 text-sm text-[#A1A1A1] hover:text-[#F5F5F5] hover:border-[#F4C430]/40 transition"
                   >
-                    {icon}
+                    {(config as any).avatarPreview ? "Change image" : "Upload image"}
                   </button>
-                ))}
+                  {(config as any).avatarPreview && (
+                    <button
+                      type="button"
+                      onClick={() => setConfig((c) => ({ ...c, avatarPreview: "" }))}
+                      className="ml-2 px-3 py-2 rounded-lg text-xs text-red-400/60 hover:text-red-400 transition"
+                    >
+                      Remove
+                    </button>
+                  )}
+                  <p className="text-[#A1A1A1]/30 text-[10px] mt-1">PNG, JPG up to 2MB. Shown on your agent profile.</p>
+                </div>
+                <input
+                  id="agent-avatar-input"
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    if (file.size > 2 * 1024 * 1024) { alert("Max 2MB"); return; }
+                    const reader = new FileReader();
+                    reader.onload = () => setConfig((c) => ({ ...c, avatarPreview: reader.result as string }));
+                    reader.readAsDataURL(file);
+                  }}
+                />
               </div>
             </div>
 
