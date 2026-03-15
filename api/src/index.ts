@@ -57,7 +57,7 @@ app.get("/", (_req, res) => {
     name: "Nastar API",
     version: "1.0.0",
     description: "Agent Service Marketplace on Celo — discover, hire, and pay agents",
-    network: "celo-sepolia",
+    network: "celo",
     contracts: CONTRACTS,
     x402: {
       enabled: PAY_TO !== "0x0000000000000000000000000000000000000000",

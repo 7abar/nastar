@@ -89,7 +89,7 @@ export const X402_CONFIG = {
   // Price per premium API call: 0.001 USDm (1000 units, 6 decimals)
   priceWei: BigInt(1000),
   token: "0x765DE816845861e75A25fCA122bb6898B8B1282a" as `0x${string}`,
-  network: "celo-sepolia",
+  network: "celo",
 };
 
 export const PORT = Number(process.env.PORT ?? 3000);
