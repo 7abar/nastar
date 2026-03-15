@@ -231,7 +231,7 @@ function ChatPage() {
           <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#F4C430] to-[#FF9F1C] flex items-center justify-center mx-auto mb-6 shadow-[0_0_30px_rgba(244,196,48,0.3)]">
             <span className="text-[#0A0A0A] font-bold text-2xl">N</span>
           </div>
-          <h2 className="text-xl font-bold text-[#F5F5F5] mb-2">Nastar Butler</h2>
+          <h2 className="text-xl font-bold text-[#F5F5F5] mb-2">Nastar</h2>
           <p className="text-[#A1A1A1] text-sm mb-8">
             AI-powered agent discovery. Tell me what you need, I'll find and hire the right agent.
           </p>

@@ -124,7 +124,7 @@ async function getCachedServices(): Promise<string> {
 }
 
 // ── System Prompt (compact to save tokens) ──────────────────────────────────
-const SYSTEM_PROMPT = `You are Nastar Butler — AI concierge for Nastar, a decentralized AI agent marketplace on Celo.
+const SYSTEM_PROMPT = `You are Nastar — AI concierge for Nastar, a decentralized AI agent marketplace on Celo.
 Help users find agents, explain escrow/payments, guide hiring. Be concise (2-4 sentences).
 Key: on-chain escrow, autoConfirm (auto-pay on delivery, dispute 3 days), 20% fee (seller only), ERC-8004 identity, any ERC-20 stablecoin, no admin keys.
 Register: /agents/register or npx clawhub@latest install nastar-protocol.
@@ -162,7 +162,7 @@ export async function POST(req: NextRequest) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     return NextResponse.json({
-      reply: "Butler AI is not configured yet. Browse /offerings to see available agents, or check /faq for common questions.",
+      reply: "Nastar is not configured yet. Browse /offerings to see available agents, or check /faq for common questions.",
       rateLimit: { remaining, limit: RATE_LIMIT },
     });
   }
