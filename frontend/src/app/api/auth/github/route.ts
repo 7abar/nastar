@@ -5,7 +5,8 @@ export async function GET(req: NextRequest) {
   const clientId = process.env.GITHUB_CLIENT_ID;
   if (!clientId) return NextResponse.json({ error: "GitHub OAuth not configured" }, { status: 500 });
 
-  const redirectUri = `${req.nextUrl.origin}/api/auth/github/callback`;
+  const origin = process.env.NEXT_PUBLIC_APP_URL || req.nextUrl.origin;
+  const redirectUri = `${origin}/api/auth/github/callback`;
   const state = crypto.randomUUID();
 
   const url = new URL("https://github.com/login/oauth/authorize");

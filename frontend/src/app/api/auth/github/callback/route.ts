@@ -6,8 +6,10 @@ export async function GET(req: NextRequest) {
   const state = req.nextUrl.searchParams.get("state");
   const savedState = req.cookies.get("gh_oauth_state")?.value;
 
+  const origin = process.env.NEXT_PUBLIC_APP_URL || req.nextUrl.origin;
+
   if (!code || !state || state !== savedState) {
-    return NextResponse.redirect(`${req.nextUrl.origin}/settings?error=github_invalid_state`);
+    return NextResponse.redirect(`${origin}/settings?error=github_invalid_state`);
   }
 
   try {
@@ -19,7 +21,7 @@ export async function GET(req: NextRequest) {
         client_id: process.env.GITHUB_CLIENT_ID,
         client_secret: process.env.GITHUB_CLIENT_SECRET,
         code,
-        redirect_uri: `${req.nextUrl.origin}/api/auth/github/callback`,
+        redirect_uri: `${origin}/api/auth/github/callback`,
       }),
     });
     const tokenData = await tokenRes.json();
@@ -44,11 +46,11 @@ export async function GET(req: NextRequest) {
 
     // Redirect back with profile data encoded
     const encoded = encodeURIComponent(JSON.stringify(profile));
-    const res = NextResponse.redirect(`${req.nextUrl.origin}/settings?social=${encoded}`);
+    const res = NextResponse.redirect(`${origin}/settings?social=${encoded}`);
     res.cookies.delete("gh_oauth_state");
     return res;
   } catch (err) {
     console.error("GitHub OAuth error:", err);
-    return NextResponse.redirect(`${req.nextUrl.origin}/settings?error=github_failed`);
+    return NextResponse.redirect(`${origin}/settings?error=github_failed`);
   }
 }
