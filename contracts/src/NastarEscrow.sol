@@ -177,6 +177,8 @@ contract NastarEscrow {
     error DeliveryTimeoutNotReached(uint256 canClaimAt, uint256 now_);
     error AbandonedDisputeTimeoutNotReached(uint256 canClaimAt, uint256 now_);
     error SelfDeal();
+    /// @notice Thrown when buyer tries to claim a unilateral refund on a judge-mediated dispute.
+    error JudgeMustResolve();
     error ReentrancyDetected();
 
     // ──────────────────────────────────────────────
@@ -301,7 +303,9 @@ contract NastarEscrow {
         deal.deliveryProof = proof;
 
         if (deal.autoConfirm) {
-            // Auto-release payment to seller (buyer opted in)
+            // Auto-release payment to seller (buyer opted in at deal creation).
+            // WARNING: By setting autoConfirm=true, buyer waives ALL dispute rights.
+            // Status goes directly to Completed — there is no way to dispute after this.
             deal.status = DealStatus.Completed;
             deal.completedAt = block.timestamp;
             emit DealDelivered(dealId, proof);
@@ -328,8 +332,13 @@ contract NastarEscrow {
 
     /**
      * @notice Buyer disputes a delivered deal.
-     *         Seller has DISPUTE_TIMEOUT to contest (50/50 split) or the buyer
-     *         can claim a full refund after the timeout.
+     *
+     * Resolution paths:
+     *   1. judgeAddress is set → AI judge calls resolveDisputeWithJudge() — buyer CANNOT
+     *      claim a unilateral refund while judge is active; seller can still contestDispute()
+     *      within DISPUTE_TIMEOUT as a fast path.
+     *   2. judgeAddress == address(0) → Seller must contest within DISPUTE_TIMEOUT (50/50 split)
+     *      or buyer claims full refund after timeout.
      */
     function disputeDeal(uint256 dealId) external {
         Deal storage deal = deals[dealId];
@@ -447,6 +456,12 @@ contract NastarEscrow {
             uint256 canRefundAt = deal.disputedAt + DISPUTE_TIMEOUT;
             if (block.timestamp < canRefundAt) {
                 revert DisputeTimeoutNotReached(canRefundAt, block.timestamp);
+            }
+            // If an AI judge is configured, the buyer cannot unilaterally claim a refund
+            // after timeout — the judge must resolve. This prevents the buyer from bypassing
+            // an unfavorable verdict by waiting out the dispute timeout.
+            if (judgeAddress != feeRecipient) {
+                revert JudgeMustResolve();
             }
             canRefund = true;
             deal.status = DealStatus.Refunded;

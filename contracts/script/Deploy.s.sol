@@ -37,7 +37,7 @@ contract DeployNastar is Script {
         console.log("NastarEscrow:     ", address(escrow));
         console.log("Fee Recipient:    ", feeRecipient);
         console.log("Judge Address:    ", judgeAddress);
-        console.log("Protocol Fee:      2.5%");
+        console.log("Protocol Fee:      20%  (seller gets 80%)");
 
         vm.stopBroadcast();
 

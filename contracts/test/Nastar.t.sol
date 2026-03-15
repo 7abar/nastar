@@ -18,6 +18,10 @@ contract NastarTest is Test {
     address public treasury = makeAddr("treasury");
     address public judge = makeAddr("judge");
 
+    // A second escrow deployed WITHOUT a judge (judgeAddress == feeRecipient)
+    // Used to test the "no judge" dispute refund path.
+    NastarEscrow public escrowNoJudge;
+
     uint256 public aliceAgentId;
     uint256 public bobAgentId;
 
@@ -27,6 +31,8 @@ contract NastarTest is Test {
 
         registry = new ServiceRegistry(address(identity));
         escrow = new NastarEscrow(address(identity), address(registry), treasury, judge);
+        // No-judge escrow: pass address(0) → judgeAddress falls back to feeRecipient (treasury)
+        escrowNoJudge = new NastarEscrow(address(identity), address(registry), treasury, address(0));
 
         aliceAgentId = identity.mint(alice);
         bobAgentId = identity.mint(bob);
@@ -262,24 +268,34 @@ contract NastarTest is Test {
     // ──────────────────────────────────────────────
 
     function test_disputeDeal_thenRefund_noFee() public {
-        uint256 serviceId = _createTestService();
-        uint256 dealId = _createTestDeal(serviceId);
-        _deliverDeal(dealId);
+        // Uses escrowNoJudge (judgeAddress == feeRecipient) — buyer CAN refund after timeout
+        usdc.mint(alice, 10e6);
+        vm.startPrank(alice);
+        usdc.approve(address(escrowNoJudge), 10e6);
+        uint256 dealId = escrowNoJudge.createDeal(
+            0, aliceAgentId, bobAgentId, address(usdc), 10e6,
+            "No-judge test", block.timestamp + 7 days, false
+        );
+        vm.stopPrank();
+
+        vm.prank(bob); escrowNoJudge.acceptDeal(dealId);
+        vm.prank(bob); escrowNoJudge.deliverDeal(dealId, "ipfs://proof");
 
         vm.prank(alice);
-        escrow.disputeDeal(dealId);
+        escrowNoJudge.disputeDeal(dealId);
 
         // Can't refund yet
         vm.prank(alice);
         vm.expectRevert();
-        escrow.claimRefund(dealId);
+        escrowNoJudge.claimRefund(dealId);
 
-        // After 3 days — full refund, NO FEE
+        // After 3 days — full refund, NO FEE (no judge configured)
         vm.warp(block.timestamp + 3 days + 1);
         vm.prank(alice);
-        escrow.claimRefund(dealId);
+        escrowNoJudge.claimRefund(dealId);
 
-        assertEq(usdc.balanceOf(alice), 1000e6);
+        // Alice starts with 1000e6 + 10e6 extra minted above, spent 10e6 on deal
+        assertEq(usdc.balanceOf(alice), 1000e6 + 10e6);
         assertEq(usdc.balanceOf(treasury), 0);
     }
 
@@ -469,23 +485,33 @@ contract NastarTest is Test {
     }
 
     function test_buyerRefundsBeforeAbandonedTimeout() public {
-        uint256 serviceId = _createTestService();
-        uint256 dealId = _createTestDeal(serviceId);
-        _deliverDeal(dealId);
+        // Uses escrowNoJudge — buyer can refund, then seller can't reclaim (deal already Refunded)
+        usdc.mint(alice, 10e6);
+        vm.startPrank(alice);
+        usdc.approve(address(escrowNoJudge), 10e6);
+        uint256 dealId = escrowNoJudge.createDeal(
+            0, aliceAgentId, bobAgentId, address(usdc), 10e6,
+            "No-judge abandoned test", block.timestamp + 7 days, false
+        );
+        vm.stopPrank();
+
+        vm.prank(bob); escrowNoJudge.acceptDeal(dealId);
+        vm.prank(bob); escrowNoJudge.deliverDeal(dealId, "ipfs://proof");
 
         vm.prank(alice);
-        escrow.disputeDeal(dealId);
+        escrowNoJudge.disputeDeal(dealId);
 
         vm.warp(block.timestamp + 3 days + 1);
         vm.prank(alice);
-        escrow.claimRefund(dealId);
+        escrowNoJudge.claimRefund(dealId);
 
+        // Seller tries to reclaim — already refunded, must revert
         vm.warp(block.timestamp + 30 days);
         vm.prank(bob);
         vm.expectRevert();
-        escrow.sellerClaimFromAbandonedDispute(dealId);
+        escrowNoJudge.sellerClaimFromAbandonedDispute(dealId);
 
-        assertEq(usdc.balanceOf(alice), 1000e6);
+        assertEq(usdc.balanceOf(alice), 1000e6 + 10e6);
     }
 
     // ──────────────────────────────────────────────
@@ -627,6 +653,28 @@ contract NastarTest is Test {
         uint256 remaining = 10e6 - fee;
         assertApproxEqAbs(usdc.balanceOf(alice), 1000e6 - 10e6 + remaining, 1);
         assertEq(usdc.balanceOf(bob), 0);
+    }
+
+    // Critical: buyer CANNOT bypass judge by waiting out dispute timeout
+    function test_buyerCannotBypassJudge_afterTimeout() public {
+        uint256 serviceId = _createTestService();
+        uint256 dealId = _createTestDeal(serviceId);
+        _deliverDeal(dealId);
+
+        vm.prank(alice);
+        escrow.disputeDeal(dealId);
+
+        // Wait past DISPUTE_TIMEOUT — with judge configured, buyer can NOT claim refund
+        vm.warp(block.timestamp + 3 days + 1);
+
+        vm.prank(alice);
+        vm.expectRevert(NastarEscrow.JudgeMustResolve.selector);
+        escrow.claimRefund(dealId);
+
+        // Judge still resolves normally
+        vm.prank(judge);
+        escrow.resolveDisputeWithJudge(dealId, 7000, "Partial delivery confirmed.");
+        assertEq(uint8(escrow.getDeal(dealId).status), uint8(NastarEscrow.DealStatus.Resolved));
     }
 
     function test_judgeRevertIfNotJudge() public {
