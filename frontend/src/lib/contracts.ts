@@ -37,11 +37,21 @@ export const CONTRACTS = {
 // ── Mento Stablecoins — Celo Sepolia Testnet ─────────────────────────────────
 // Source: https://docs.celo.org/tooling/contracts/token-contracts
 export const CELO_TOKENS = {
-  USDm: "0xdE9e4C3ce781b4bA68120d6261cbad65ce0aB00b" as `0x${string}`,  // ✓ Celo Sepolia verified
-  BRLm: "0x2294298942fdc79417DE9E0D740A4957E0e7783a" as `0x${string}`,
+  USDm:  "0xdE9e4C3ce781b4bA68120d6261cbad65ce0aB00b" as `0x${string}`,  // ✓ Celo Sepolia verified
+  EURm:  "0xA99dC247d6b7B2E3ab48a1fEE101b83cD6aCd82a" as `0x${string}`,
+  BRLm:  "0x2294298942fdc79417DE9E0D740A4957E0e7783a" as `0x${string}`,
   COPm: "0x5F8d55c3627d2dc0a2B4afa798f877242F382F67" as `0x${string}`,
   XOFm: "0x5505b70207aE3B826c1A7607F19F3Bf73444A082" as `0x${string}`,
-  KESm: "0xC7e4635651E3e3Af82b61d3E23c159438daE3BbF" as `0x${string}`,
+  KESm:  "0xC7e4635651E3e3Af82b61d3E23c159438daE3BbF" as `0x${string}`,
+  PHPm:  "0x0352976d940a2C3FBa0C3623198947Ee1d17869E" as `0x${string}`,
+  GBPm:  "0x85F5181Abdbf0e1814Fc4358582Ae07b8eBA3aF3" as `0x${string}`,
+  NGNm:  "0x3d5ae86F34E2a82771496D140daFAEf3789dF888" as `0x${string}`,
+  GHSm:  "0x5e94B8C872bD47BC4255E60ECBF44D5E66e7401C" as `0x${string}`,
+  ZARm:  "0x10CCfB235b0E1Ed394bACE4560C3ed016697687e" as `0x${string}`,
+  CADm:  "0xF151c9a13b78C84f93f50B8b3bC689fedc134F60" as `0x${string}`,
+  AUDm:  "0x5873Faeb42F3563dcD77F0fbbdA818E6d6DA3139" as `0x${string}`,
+  JPYm:  "0x85Bee67D435A39f7467a8a9DE34a5B73D25Df426" as `0x${string}`,
+  CHFm:  "0x284E9b7B623eAE866914b7FA0eB720C2Bb3C2980" as `0x${string}`,
   USDC: "0x01C5C0122039549AD1493B8220cABEdD739BC44E" as `0x${string}`,
 } as const;
 
@@ -54,12 +64,27 @@ export interface TokenMeta {
 }
 
 export const TOKEN_LIST: TokenMeta[] = [
-  { symbol: "USDm", name: "Mento Dollar",           flag: "🇺🇸", address: CELO_TOKENS.USDm, decimals: 18 },
-  { symbol: "BRLm", name: "Mento Brazilian Real",   flag: "🇧🇷", address: CELO_TOKENS.BRLm, decimals: 18 },
-  { symbol: "COPm", name: "Mento Colombian Peso",   flag: "🇨🇴", address: CELO_TOKENS.COPm, decimals: 18 },
-  { symbol: "XOFm", name: "Mento West African CFA", flag: "🌍", address: CELO_TOKENS.XOFm, decimals: 18 },
-  { symbol: "KESm", name: "Mento Kenyan Shilling",  flag: "🇰🇪", address: CELO_TOKENS.KESm, decimals: 18 },
-  { symbol: "USDC", name: "USD Coin",               flag: "💵", address: CELO_TOKENS.USDC, decimals: 6  },
+  // USD-pegged
+  { symbol: "USDm", name: "Mento Dollar",              flag: "🇺🇸", address: CELO_TOKENS.USDm, decimals: 18 },
+  { symbol: "USDC", name: "USD Coin",                  flag: "💵", address: CELO_TOKENS.USDC, decimals: 6  },
+  // Major currencies
+  { symbol: "EURm", name: "Mento Euro",                flag: "🇪🇺", address: CELO_TOKENS.EURm, decimals: 18 },
+  { symbol: "GBPm", name: "Mento British Pound",       flag: "🇬🇧", address: CELO_TOKENS.GBPm, decimals: 18 },
+  { symbol: "CHFm", name: "Mento Swiss Franc",         flag: "🇨🇭", address: CELO_TOKENS.CHFm, decimals: 18 },
+  { symbol: "CADm", name: "Mento Canadian Dollar",     flag: "🇨🇦", address: CELO_TOKENS.CADm, decimals: 18 },
+  { symbol: "AUDm", name: "Mento Australian Dollar",   flag: "🇦🇺", address: CELO_TOKENS.AUDm, decimals: 18 },
+  { symbol: "JPYm", name: "Mento Japanese Yen",        flag: "🇯🇵", address: CELO_TOKENS.JPYm, decimals: 18 },
+  // Latin America
+  { symbol: "BRLm", name: "Mento Brazilian Real",      flag: "🇧🇷", address: CELO_TOKENS.BRLm, decimals: 18 },
+  { symbol: "COPm", name: "Mento Colombian Peso",      flag: "🇨🇴", address: CELO_TOKENS.COPm, decimals: 18 },
+  // Africa
+  { symbol: "KESm", name: "Mento Kenyan Shilling",     flag: "🇰🇪", address: CELO_TOKENS.KESm, decimals: 18 },
+  { symbol: "NGNm", name: "Mento Nigerian Naira",      flag: "🇳🇬", address: CELO_TOKENS.NGNm, decimals: 18 },
+  { symbol: "GHSm", name: "Mento Ghanaian Cedi",       flag: "🇬🇭", address: CELO_TOKENS.GHSm, decimals: 18 },
+  { symbol: "ZARm", name: "Mento South African Rand",  flag: "🇿🇦", address: CELO_TOKENS.ZARm, decimals: 18 },
+  { symbol: "XOFm", name: "Mento West African CFA",    flag: "🌍", address: CELO_TOKENS.XOFm, decimals: 18 },
+  // Asia-Pacific
+  { symbol: "PHPm", name: "Mento Philippine Peso",     flag: "🇵🇭", address: CELO_TOKENS.PHPm, decimals: 18 },
 ];
 
 export function getTokenByAddress(address: string): TokenMeta | undefined {
