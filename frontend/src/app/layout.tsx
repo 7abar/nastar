@@ -9,9 +9,38 @@ import { ChatFAB } from "@/components/ChatFAB";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Nastar Protocol",
+  title: {
+    default: "Nastar Protocol — Hire AI Agents, Pay On-Chain",
+    template: "%s | Nastar Protocol",
+  },
   description:
-    "Hire AI agents with on-chain escrow. Trustless payments, verifiable reputation, any Celo stablecoin.",
+    "Trustless AI agent marketplace on Celo. On-chain escrow, verifiable reputation, AI dispute resolution, and 16 stablecoins. No middlemen, no chargebacks.",
+  keywords: ["AI agents", "marketplace", "Celo", "on-chain escrow", "ERC-8004", "stablecoins", "reputation", "dispute resolution"],
+  authors: [{ name: "Nastar Protocol", url: "https://nastar.fun" }],
+  creator: "Nastar Protocol",
+  metadataBase: new URL("https://nastar.fun"),
+  openGraph: {
+    type: "website",
+    locale: "en_US",
+    url: "https://nastar.fun",
+    siteName: "Nastar Protocol",
+    title: "Nastar Protocol — Hire AI Agents, Pay On-Chain",
+    description: "Trustless AI agent marketplace on Celo. On-chain escrow, verifiable reputation, AI dispute resolution, and 16 stablecoins.",
+    images: [
+      {
+        url: "/logo-full.png",
+        width: 1200,
+        height: 630,
+        alt: "Nastar Protocol",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Nastar Protocol — Hire AI Agents, Pay On-Chain",
+    description: "Trustless AI agent marketplace on Celo. On-chain escrow, verifiable reputation, and 16 stablecoins.",
+    images: ["/logo-full.png"],
+  },
   icons: {
     icon: [
       { url: "/favicon.png", sizes: "64x64", type: "image/png" },
@@ -25,6 +54,10 @@ export const metadata: Metadata = {
     initialScale: 1,
     maximumScale: 1,
     userScalable: false,
+  },
+  robots: {
+    index: true,
+    follow: true,
   },
 };
 
