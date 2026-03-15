@@ -438,156 +438,131 @@ export default function LaunchPage() {
 
     return (
       <div className="bg-[#0A0A0A] text-[#F5F5F5] min-h-screen">
-        <div className="max-w-2xl mx-auto px-4 py-12">
+        <div className="max-w-xl mx-auto px-4 py-10">
 
           {/* Header */}
-          <div className="mb-8">
-            <div className="flex items-center gap-3">
-              <button onClick={() => setStep("template")} className="text-[#A1A1A1] text-sm hover:text-white transition mr-2">
-                ←
-              </button>
-              <span className="text-2xl">{tmpl.icon}</span>
-              <div>
-                <h1 className="text-xl font-bold">{tmpl.name}</h1>
-                <p className="text-[#A1A1A1] text-xs">Configure your agent</p>
-              </div>
+          <div className="flex items-center gap-3 mb-8">
+            <button onClick={() => setStep("template")} className="w-8 h-8 rounded-lg bg-white/[0.04] flex items-center justify-center text-[#A1A1A1] hover:text-white hover:bg-white/[0.08] transition">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+              </svg>
+            </button>
+            <div>
+              <h1 className="text-lg font-bold">Configure {tmpl.name}</h1>
+              <p className="text-[#A1A1A1]/50 text-xs">Step 2 of 4</p>
             </div>
           </div>
 
           {/* Form */}
-          <div className="space-y-5">
-            {/* Agent Avatar */}
-            <div>
-              <label className="text-[#A1A1A1] text-sm mb-2 block">Agent Avatar</label>
-              <div className="flex items-center gap-4">
-                <div
-                  onClick={() => document.getElementById("agent-avatar-input")?.click()}
-                  className="w-16 h-16 rounded-xl bg-white/[0.04] border-2 border-dashed border-white/[0.15] hover:border-[#F4C430]/50 transition cursor-pointer flex items-center justify-center overflow-hidden group shrink-0"
-                >
-                  {(config as any).avatarPreview ? (
-                    <img src={(config as any).avatarPreview} alt="avatar" className="w-full h-full object-cover rounded-lg" />
-                  ) : (
-                    <div className="text-center">
-                      <svg className="w-6 h-6 text-[#A1A1A1]/30 group-hover:text-[#F4C430] transition mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
-                      </svg>
-                    </div>
-                  )}
-                </div>
-                <div className="flex-1">
-                  <button
-                    type="button"
-                    onClick={() => document.getElementById("agent-avatar-input")?.click()}
-                    className="px-4 py-2 rounded-lg border border-white/10 text-sm text-[#A1A1A1] hover:text-[#F5F5F5] hover:border-[#F4C430]/40 transition"
-                  >
-                    {(config as any).avatarPreview ? "Change image" : "Upload image"}
-                  </button>
-                  {(config as any).avatarPreview && (
-                    <button
-                      type="button"
-                      onClick={() => setConfig((c) => ({ ...c, avatarPreview: "" }))}
-                      className="ml-2 px-3 py-2 rounded-lg text-xs text-red-400/60 hover:text-red-400 transition"
-                    >
-                      Remove
-                    </button>
-                  )}
-                  <p className="text-[#A1A1A1]/30 text-[10px] mt-1">PNG, JPG up to 2MB. Shown on your agent profile.</p>
-                </div>
+          <div className="space-y-6">
+
+            {/* Avatar + Name row */}
+            <div className="flex items-start gap-4">
+              <div
+                onClick={() => document.getElementById("agent-avatar-input")?.click()}
+                className="w-20 h-20 rounded-2xl bg-white/[0.03] border-2 border-dashed border-white/[0.1] hover:border-[#F4C430]/40 transition cursor-pointer flex items-center justify-center overflow-hidden group shrink-0"
+              >
+                {(config as any).avatarPreview ? (
+                  <img src={(config as any).avatarPreview} alt="avatar" className="w-full h-full object-cover" />
+                ) : (
+                  <svg className="w-7 h-7 text-[#A1A1A1]/20 group-hover:text-[#F4C430]/60 transition" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z" />
+                  </svg>
+                )}
+              </div>
+              <input id="agent-avatar-input" type="file" accept="image/*" className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  if (file.size > 2 * 1024 * 1024) { alert("Max 2MB"); return; }
+                  const reader = new FileReader();
+                  reader.onload = () => setConfig((c) => ({ ...c, avatarPreview: reader.result as string }));
+                  reader.readAsDataURL(file);
+                }}
+              />
+              <div className="flex-1 space-y-1">
+                <label className="text-[#A1A1A1]/60 text-xs">Agent Name *</label>
                 <input
-                  id="agent-avatar-input"
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (!file) return;
-                    if (file.size > 2 * 1024 * 1024) { alert("Max 2MB"); return; }
-                    const reader = new FileReader();
-                    reader.onload = () => setConfig((c) => ({ ...c, avatarPreview: reader.result as string }));
-                    reader.readAsDataURL(file);
-                  }}
+                  value={config.name}
+                  onChange={(e) => setConfig((c) => ({ ...c, name: e.target.value }))}
+                  placeholder={`e.g. My ${tmpl.name}`}
+                  className="w-full px-3 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-[#F5F5F5] placeholder-[#A1A1A1]/30 focus:outline-none focus:border-[#F4C430]/40 text-sm transition"
                 />
+                <p className="text-[#A1A1A1]/30 text-[10px]">Click image to upload avatar (optional)</p>
               </div>
             </div>
 
+            {/* Description */}
             <div>
-              <label className="text-[#A1A1A1] text-sm mb-1 block">Agent Name *</label>
-              <input
-                value={config.name}
-                onChange={(e) => setConfig((c) => ({ ...c, name: e.target.value }))}
-                placeholder={`e.g. My ${tmpl.name}`}
-                className="w-full px-4 py-3 rounded-lg bg-white/5 border border-[#F4C430]/30 text-white placeholder-white/20 focus:outline-none focus:border-[#F4C430]/70"
-              />
-            </div>
-
-            <div>
-              <label className="text-[#A1A1A1] text-sm mb-1 block">Description *</label>
+              <label className="text-[#A1A1A1]/60 text-xs mb-1.5 block">Description *</label>
               <textarea
                 value={config.description}
                 onChange={(e) => setConfig((c) => ({ ...c, description: e.target.value }))}
-                placeholder="What does this agent do for you?"
+                placeholder="What does this agent do?"
                 rows={2}
-                className="w-full px-4 py-3 rounded-lg bg-white/5 border border-[#F4C430]/30 text-white placeholder-white/20 focus:outline-none focus:border-[#F4C430]/70 resize-none"
+                className="w-full px-3 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-[#F5F5F5] placeholder-[#A1A1A1]/30 focus:outline-none focus:border-[#F4C430]/40 text-sm resize-none transition"
               />
             </div>
 
+            {/* System Prompt */}
             <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="text-[#A1A1A1] text-sm">System Prompt *</label>
-                <span className="text-xs text-[#F4C430]/60">Pre-filled from template — edit freely</span>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-[#A1A1A1]/60 text-xs">System Prompt *</label>
+                <span className="text-[10px] text-[#A1A1A1]/30">Pre-filled from template</span>
               </div>
               <textarea
                 value={config.systemPrompt}
                 onChange={(e) => setConfig((c) => ({ ...c, systemPrompt: e.target.value }))}
                 placeholder="Define how your agent thinks and behaves..."
-                rows={8}
-                className="w-full px-4 py-3 rounded-lg bg-white/5 border border-[#F4C430]/30 text-white placeholder-white/20 focus:outline-none focus:border-[#F4C430]/70 resize-none font-mono text-sm"
+                rows={6}
+                className="w-full px-3 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-[#F5F5F5] placeholder-[#A1A1A1]/30 focus:outline-none focus:border-[#F4C430]/40 text-sm resize-none font-mono transition"
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-[#A1A1A1] text-sm mb-1 block">
-                  Price per Call
-                  <span className="ml-1.5 text-[10px] text-[#A1A1A1]/50 font-normal">— buyers pay this per task</span>
-                </label>
-                <div className="flex gap-2">
-                  <input
-                    value={config.price}
-                    onChange={(e) => setConfig((c) => ({ ...c, price: e.target.value }))}
-                    type="number" step="0.01" min="0.01"
-                    className="flex-1 px-4 py-3 rounded-lg bg-white/5 border border-[#F4C430]/30 text-white focus:outline-none focus:border-[#F4C430]/70"
-                  />
-                  <select
-                    value={config.paymentToken}
-                    onChange={(e) => setConfig((c) => ({ ...c, paymentToken: e.target.value as `0x${string}` }))}
-                    className="px-3 py-3 rounded-lg bg-white/5 border border-[#F4C430]/30 text-white focus:outline-none focus:border-[#F4C430]/70 text-sm"
-                  >
-                    {TOKEN_LIST.map((t) => (
-                      <option key={t.address} value={t.address} className="bg-[#111]">
-                        {t.flag} {t.symbol}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <div>
-                <label className="text-[#A1A1A1] text-sm mb-1 block">Tags</label>
+            {/* Price + Token */}
+            <div>
+              <label className="text-[#A1A1A1]/60 text-xs mb-1.5 block">Price per Task</label>
+              <div className="flex gap-2">
                 <input
-                  value={config.tags}
-                  onChange={(e) => setConfig((c) => ({ ...c, tags: e.target.value }))}
-                  placeholder="trading, defi, celo"
-                  className="w-full px-4 py-3 rounded-lg bg-white/5 border border-[#F4C430]/30 text-white placeholder-white/20 focus:outline-none focus:border-[#F4C430]/70"
+                  value={config.price}
+                  onChange={(e) => setConfig((c) => ({ ...c, price: e.target.value }))}
+                  type="number" step="0.01" min="0.01"
+                  className="flex-1 px-3 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-[#F5F5F5] focus:outline-none focus:border-[#F4C430]/40 text-sm transition"
                 />
+                <select
+                  value={config.paymentToken}
+                  onChange={(e) => setConfig((c) => ({ ...c, paymentToken: e.target.value as `0x${string}` }))}
+                  className="px-3 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-[#F5F5F5] focus:outline-none focus:border-[#F4C430]/40 text-sm transition"
+                >
+                  {TOKEN_LIST.map((t) => (
+                    <option key={t.address} value={t.address} className="bg-[#111]">
+                      {t.flag} {t.symbol}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
 
+            {/* Tags */}
+            <div>
+              <label className="text-[#A1A1A1]/60 text-xs mb-1.5 block">Tags</label>
+              <input
+                value={config.tags}
+                onChange={(e) => setConfig((c) => ({ ...c, tags: e.target.value }))}
+                placeholder="e.g. trading, defi, celo"
+                className="w-full px-3 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-[#F5F5F5] placeholder-[#A1A1A1]/30 focus:outline-none focus:border-[#F4C430]/40 text-sm transition"
+              />
+              <p className="text-[#A1A1A1]/30 text-[10px] mt-1">Comma-separated. Helps buyers find your agent.</p>
+            </div>
+
+            {/* Next button */}
             <button
               onClick={() => setStep("llm")}
               disabled={!config.name.trim() || !config.systemPrompt.trim()}
-              className="w-full py-3 rounded-xl gradient-btn font-semibold disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-[0_0_15px_#F4C430] transition"
+              className="w-full py-3.5 rounded-xl gradient-btn font-semibold text-sm disabled:opacity-40 disabled:cursor-not-allowed hover:shadow-[0_0_20px_rgba(244,196,48,0.3)] transition mt-2"
             >
-              Next: LLM Backend →
+              Next: LLM Backend
             </button>
           </div>
         </div>
