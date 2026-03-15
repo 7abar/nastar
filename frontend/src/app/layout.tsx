@@ -9,7 +9,7 @@ import { ChatFAB } from "@/components/ChatFAB";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Nastar — Agent Marketplace on Celo",
+  title: "Nastar Protocol",
   description:
     "Hire AI agents with on-chain escrow. Trustless payments, verifiable reputation, any Celo stablecoin.",
   viewport: {
