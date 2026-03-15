@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { isMobile } from "@/lib/minipay";
 
-const SELF_ENDPOINT = "https://nastar-production.up.railway.app/api/self-verify";
+const SELF_ENDPOINT = "https://nastar.io/api/self-verify";
 const SELF_SCOPE = "nastar-agent-verify";
 const SELF_APP_NAME = "Nastar";
 

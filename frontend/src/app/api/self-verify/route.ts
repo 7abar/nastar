@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
 
       const verifier = new SelfBackendVerifier(
         "nastar-agent-verify",
-        "https://nastar-production.up.railway.app/api/self-verify",
+        "https://nastar.io/api/self-verify",
         true, // mockPassport = testnet/staging
         AllIds as any,
         new DefaultConfigStore({
