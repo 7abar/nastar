@@ -42,7 +42,7 @@ export default function PublicProfilePage() {
   const [reputation, setReputation] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
-  const [showErc8004, setShowErc8004] = useState(false);
+  // ERC-8004 badge uses CSS group-hover, no state needed
 
   const shortAddr = address ? `${address.slice(0, 6)}...${address.slice(-4)}` : "";
   const isValid = /^0x[0-9a-f]{40}$/i.test(address);
@@ -184,48 +184,41 @@ export default function PublicProfilePage() {
                   </div>
                 )}
 
-                {/* ERC-8004 Badge + Links (Virtuals-style: click to toggle) */}
-                <div className="flex items-center gap-2 flex-wrap">
-                  <button
-                    onClick={() => setShowErc8004(!showErc8004)}
-                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-medium transition ${
-                      showErc8004
-                        ? "bg-[#F4C430]/20 border-[#F4C430]/40 text-[#F4C430]"
-                        : "bg-[#F4C430]/10 border-[#F4C430]/20 text-[#F4C430] hover:bg-[#F4C430]/20"
-                    }`}
-                  >
-                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                {/* ERC-8004 Badge — hover reveals View Tx + 8004scan */}
+                <div className="group/erc relative inline-flex items-center">
+                  {/* Default badge */}
+                  <span className="group-hover/erc:hidden inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-500/10 border border-green-500/30 text-green-400 text-xs font-medium">
+                    <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clipRule="evenodd" />
                     </svg>
                     ERC-8004
-                  </button>
+                  </span>
 
-                  {showErc8004 && (
-                    <>
-                      <a
-                        href={`https://sepolia.celoscan.io/address/${rawAddress}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#1A1A1A] border border-[#F4C430]/30 text-[#F4C430] text-xs font-medium hover:bg-[#F4C430]/10 transition"
-                      >
-                        View Tx
-                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
-                        </svg>
-                      </a>
-                      <a
-                        href={`https://agentscan.info/agents/${rawAddress}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#1A1A1A] border border-[#F4C430]/30 text-[#F4C430] text-xs font-medium hover:bg-[#F4C430]/10 transition"
-                      >
-                        8004scan
-                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
-                        </svg>
-                      </a>
-                    </>
-                  )}
+                  {/* Hover: two buttons */}
+                  <div className="hidden group-hover/erc:flex items-center gap-2">
+                    <a
+                      href={`https://sepolia.celoscan.io/address/${rawAddress}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-500/10 border border-green-500/30 text-green-400 text-xs font-medium hover:bg-green-500/20 transition"
+                    >
+                      View Tx
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                      </svg>
+                    </a>
+                    <a
+                      href={`https://agentscan.info/agents/${rawAddress}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-500/10 border border-green-500/30 text-green-400 text-xs font-medium hover:bg-green-500/20 transition"
+                    >
+                      8004scan
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                      </svg>
+                    </a>
+                  </div>
                 </div>
 
                 {/* Description */}
