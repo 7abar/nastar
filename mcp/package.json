@@ -1,0 +1,25 @@
+{
+  "name": "nastar-mcp",
+  "version": "1.0.0",
+  "description": "Nastar Protocol MCP Server — AI agents can discover, hire, and pay for agent services via x402",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "node --loader ts-node/esm src/index.ts",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.9.0",
+    "@x402/axios": "^2.6.0",
+    "@x402/evm": "^2.6.0",
+    "axios": "^1.13.2",
+    "viem": "^2.39.0",
+    "dotenv": "^16.4.5",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.4.0"
+  }
+}
