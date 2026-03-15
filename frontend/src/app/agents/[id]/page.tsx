@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import { usePrivy } from "@privy-io/react-auth";
 import { useParams } from "next/navigation";
 import Link from "next/link";
+import { supabase } from "@/lib/supabase";
 import {
   getStoredAgents,
   updateAgent,
@@ -88,6 +89,8 @@ export default function AgentDetailPage() {
   const [showKey, setShowKey] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"reviews" | "transactions" | "services">("services");
+  const [storedAgent, setStoredAgent] = useState<{ name: string; description: string | null; avatar: string | null } | null>(null);
+  const [reputation, setReputation] = useState<{ score: number; tier: string } | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -125,6 +128,32 @@ export default function AgentDetailPage() {
           const dealsRes = await fetch(`${API_URL}/v1/deals/agent/${agentId}`);
           if (dealsRes.ok) setDeals(await dealsRes.json());
         } catch {}
+
+        // Fetch reputation
+        try {
+          const repRes = await fetch(`${API_URL}/v1/reputation/${agentId}`);
+          if (repRes.ok) setReputation(await repRes.json());
+        } catch {}
+
+        // Fetch stored agent metadata from Supabase
+        try {
+          const { data } = await supabase
+            .from("registered_agents")
+            .select("name, description, avatar")
+            .eq("agent_nft_id", agentId)
+            .single();
+          if (data) setStoredAgent(data);
+        } catch {}
+        if (!storedAgent) {
+          try {
+            const { data } = await supabase
+              .from("hosted_agents")
+              .select("name, description")
+              .eq("agent_nft_id", agentId)
+              .single();
+            if (data) setStoredAgent({ ...data, avatar: null });
+          } catch {}
+        }
       } catch (err) {
         console.error("Failed to fetch agent:", err);
       }
@@ -172,52 +201,65 @@ export default function AgentDetailPage() {
       <div className="min-h-screen bg-[#0A0A0A] text-[#F5F5F5]">
         <div className="max-w-3xl mx-auto px-4 py-8 md:py-12">
 
-          {/* Header */}
-          <div className="flex items-start gap-4 mb-5">
-            <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-[#F4C430]/20 to-[#FF9F1C]/20 border border-[#F4C430]/30 flex items-center justify-center text-[#F4C430] font-bold text-xl shrink-0">
-              {onChainAgent.name.charAt(0).toUpperCase()}
-            </div>
-            <div className="flex-1 min-w-0">
-              <h1 className="text-xl font-bold">{onChainAgent.name}</h1>
-              <div className="flex items-center gap-3 mt-1 flex-wrap">
-                <button onClick={() => copy(onChainAgent.address, "addr")} className="text-[#A1A1A1]/50 text-xs font-mono hover:text-[#A1A1A1]">
-                  {onChainAgent.address.slice(0, 6)}...{onChainAgent.address.slice(-4)} {copied === "addr" ? "✓" : ""}
-                </button>
-                <div className="group/erc relative inline-flex items-center">
-                  <span className="group-hover/erc:hidden inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-500/10 border border-green-500/30 text-green-400 text-xs font-medium">
-                    <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clipRule="evenodd" />
-                    </svg>
-                    ERC-8004
-                  </span>
-                  <div className="hidden group-hover/erc:flex items-center gap-2">
-                    <a href={`https://celoscan.io/address/${IDENTITY_REGISTRY}`} target="_blank" rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-500/10 border border-green-500/30 text-green-400 text-xs font-medium hover:bg-green-500/20 transition">
-                      View Tx
-                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" /></svg>
-                    </a>
-                    <a href={`https://agentscan.info/agents/${onChainAgent.address}`} target="_blank" rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-500/10 border border-green-500/30 text-green-400 text-xs font-medium hover:bg-green-500/20 transition">
-                      8004scan
-                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" /></svg>
-                    </a>
-                  </div>
+          {/* Header — Virtuals style */}
+          <div className="p-6 rounded-2xl bg-gradient-to-r from-[#0d2818]/60 to-[#0A0A0A] border border-green-900/30 mb-6">
+            <div className="flex items-start gap-5">
+              {/* Avatar */}
+              <div className="relative shrink-0">
+                <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-gradient-to-br from-green-500/20 to-emerald-500/10 border-2 border-green-500/30 flex items-center justify-center overflow-hidden">
+                  {storedAgent?.avatar && storedAgent.avatar.startsWith("http") ? (
+                    <img src={storedAgent.avatar} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-3xl font-bold text-green-400">{onChainAgent.name.charAt(0).toUpperCase()}</span>
+                  )}
                 </div>
-                <span className="text-[#A1A1A1]/30 text-xs">{avgRating.toFixed(1)} / 5.0</span>
+                {/* TrustScore badge on avatar */}
+                <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-[#F4C430] flex items-center justify-center text-[#0A0A0A] text-[9px] font-bold border-2 border-[#0A0A0A]">
+                  {reputation?.score || 0}
+                </div>
               </div>
-              <p className="text-[#A1A1A1]/60 text-sm mt-2 leading-relaxed line-clamp-3">
-                {onChainAgent.services.map((s) => s.description).join(". ").slice(0, 200)}...
-              </p>
+
+              {/* Info */}
+              <div className="flex-1 min-w-0">
+                <h1 className="text-xl md:text-2xl font-bold">{storedAgent?.name || onChainAgent.name}</h1>
+                <div className="flex items-center gap-2 mt-1">
+                  <button onClick={() => copy(onChainAgent.address, "addr")} className="inline-flex items-center gap-1 text-[#A1A1A1]/50 text-xs font-mono hover:text-[#A1A1A1] transition">
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 011.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 00-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 01-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 00-3.375-3.375h-1.5a1.125 1.125 0 01-1.125-1.125v-1.5a3.375 3.375 0 00-3.375-3.375H9.75" /></svg>
+                    {onChainAgent.address.slice(0, 6)}...{onChainAgent.address.slice(-4)} {copied === "addr" ? "✓" : ""}
+                  </button>
+                </div>
+                <div className="flex items-center gap-2.5 mt-2.5 flex-wrap">
+                  {/* ERC-8004 green pill */}
+                  <a href={`https://celoscan.io/address/${IDENTITY_REGISTRY}`} target="_blank" rel="noopener noreferrer"
+                    className="group/erc inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-500/10 border border-green-500/30 text-green-400 text-xs font-medium hover:bg-green-500/20 transition">
+                    <span className="text-sm">💎</span>
+                    ERC-8004
+                  </a>
+                  {/* TrustScore */}
+                  <span className="inline-flex items-center gap-1.5 text-xs text-green-400">
+                    <span className="w-2 h-2 rounded-full bg-green-400" />
+                    {reputation?.score || 0}%
+                  </span>
+                </div>
+              </div>
+
+              {/* Right buttons */}
+              <div className="flex flex-col gap-2 shrink-0">
+                <a href={`/chat/${id}`}
+                  className="px-6 py-2 rounded-full bg-[#F4C430] text-[#0A0A0A] text-sm font-bold hover:shadow-[0_0_15px_rgba(244,196,48,0.3)] transition text-center">
+                  Hire
+                </a>
+                <a href={`https://celoscan.io/address/${onChainAgent.address}`} target="_blank" rel="noopener noreferrer"
+                  className="px-6 py-2 rounded-full border border-white/[0.15] text-[#A1A1A1] text-sm hover:text-[#F5F5F5] hover:border-white/[0.3] transition text-center">
+                  CeloScan
+                </a>
+              </div>
             </div>
-            {/* Right side buttons */}
-            <div className="flex flex-col gap-2 shrink-0">
-              <Link
-                href={`/chat?agent=${onChainAgent.agentId}&name=${encodeURIComponent(onChainAgent.name)}`}
-                className="px-5 py-2 rounded-lg gradient-btn text-sm font-bold hover:shadow-[0_0_15px_rgba(244,196,48,0.3)] transition"
-              >
-                Hire
-              </Link>
-            </div>
+
+            {/* Description */}
+            <p className="text-[#A1A1A1]/60 text-sm mt-4 leading-relaxed">
+              {storedAgent?.description || onChainAgent.services.map((s) => s.description).join(". ").slice(0, 300)}
+            </p>
           </div>
 
           {/* Stats */}
