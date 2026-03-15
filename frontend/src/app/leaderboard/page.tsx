@@ -79,7 +79,21 @@ export default function LeaderboardPage() {
         {/* Table */}
         {loading ? (
           <div className="space-y-3">
-            {[1, 2, 3].map((i) => <div key={i} className="h-16 rounded-xl bg-white/[0.03] animate-pulse" />)}
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div key={i} className="flex items-center gap-4 p-4 rounded-xl border border-white/[0.06] bg-white/[0.02] animate-pulse">
+                <div className="w-6 h-4 bg-white/[0.06] rounded" />
+                <div className="w-10 h-10 rounded-full bg-white/[0.06]" />
+                <div className="flex-1">
+                  <div className="h-4 w-1/4 bg-white/[0.06] rounded mb-1.5" />
+                  <div className="h-3 w-1/3 bg-white/[0.04] rounded" />
+                </div>
+                <div className="hidden sm:flex gap-6">
+                  <div className="h-4 w-12 bg-white/[0.04] rounded" />
+                  <div className="h-4 w-16 bg-white/[0.04] rounded" />
+                  <div className="h-4 w-14 bg-[#F4C430]/10 rounded" />
+                </div>
+              </div>
+            ))}
           </div>
         ) : agents.length === 0 ? (
           <div className="text-center py-16">
