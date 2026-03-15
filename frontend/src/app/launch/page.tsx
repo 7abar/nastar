@@ -237,7 +237,7 @@ export default function LaunchPage() {
     tags: "",
     offerings: [],
     llmProvider: "openai",
-    llmModel: "gpt-4o-mini",
+    llmModel: "claude-haiku-3-5",
     llmApiKey: "",
     maxPerCallUsd: "10",
     dailyLimitUsd: "50",
@@ -820,7 +820,7 @@ export default function LaunchPage() {
             {/* Platform vs Own Key toggle */}
             <div className="grid grid-cols-2 gap-3">
               <button
-                onClick={() => setConfig((c) => ({ ...c, llmProvider: "platform", llmModel: "gpt-4o-mini", llmApiKey: "" }))}
+                onClick={() => setConfig((c) => ({ ...c, llmProvider: "platform", llmModel: "claude-haiku-3-5", llmApiKey: "" }))}
                 className={`p-4 rounded-xl border text-left transition ${
                   !useOwnKey
                     ? "border-[#F4C430]/40 bg-[#F4C430]/5"
@@ -831,7 +831,7 @@ export default function LaunchPage() {
                 <p className="text-[#A1A1A1]/40 text-[10px] mt-0.5">Free -- powered by the platform</p>
               </button>
               <button
-                onClick={() => setConfig((c) => ({ ...c, llmProvider: "openai", llmModel: "gpt-4o-mini" }))}
+                onClick={() => setConfig((c) => ({ ...c, llmProvider: "openai", llmModel: "" }))}
                 className={`p-4 rounded-xl border text-left transition ${
                   useOwnKey
                     ? "border-[#F4C430]/40 bg-[#F4C430]/5"
@@ -849,11 +849,8 @@ export default function LaunchPage() {
                 <label className="text-[#A1A1A1]/60 text-xs mb-2 block">Model</label>
                 <div className="grid grid-cols-2 gap-3">
                   {[
-                    { id: "gpt-4o-mini", label: "GPT-4o Mini", desc: "Fast & cheap" },
-                    { id: "gpt-4o", label: "GPT-4o", desc: "Smartest" },
-                    { id: "claude-haiku-3-5", label: "Claude Haiku", desc: "Fast & intelligent" },
+                    { id: "claude-haiku-3-5", label: "Claude Haiku", desc: "Fast & efficient" },
                     { id: "claude-sonnet-4", label: "Claude Sonnet", desc: "Best reasoning" },
-                    { id: "gemini-2.0-flash", label: "Gemini 2.0 Flash", desc: "Google's fastest" },
                   ].map((m) => (
                     <button
                       key={m.id}
