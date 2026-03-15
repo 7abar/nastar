@@ -48,7 +48,7 @@ import {IERC721} from "forge-std/interfaces/IERC721.sol";
  *   - Minimum deal amount prevents dust/griefing attacks
  *   - Minimum deadline prevents uncompleable deals
  *   - Clean dispute timeout boundary (no race condition)
- *   - 2.5% protocol fee on seller payments only (refunds are fee-free)
+ *   - 20% protocol fee (Nastar keeps 20%, seller gets 80%) on seller payments only (refunds are fee-free)
  */
 contract NastarEscrow {
     // ──────────────────────────────────────────────
@@ -110,8 +110,9 @@ contract NastarEscrow {
     // Constants
     // ──────────────────────────────────────────────
 
-    /// @notice Protocol fee in basis points (250 = 2.5%).
-    uint256 public constant PROTOCOL_FEE_BPS = 250;
+    /// @notice Protocol fee in basis points (2000 = 20%).
+    /// Nastar Protocol takes 20%, seller receives 80% of deal amount.
+    uint256 public constant PROTOCOL_FEE_BPS = 2000;
 
     /// @notice Seller has 3 days to contest or respond after a dispute.
     uint256 public constant DISPUTE_TIMEOUT = 3 days;

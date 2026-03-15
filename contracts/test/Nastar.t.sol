@@ -39,7 +39,7 @@ contract NastarTest is Test {
     // ──────────────────────────────────────────────
 
     function _fee(uint256 amount) internal pure returns (uint256) {
-        return (amount * 250) / 10000;
+        return (amount * 2000) / 10000;
     }
 
     function _createTestService() internal returns (uint256) {
@@ -252,7 +252,7 @@ contract NastarTest is Test {
 
     function test_feeConstants() public view {
         assertEq(escrow.feeRecipient(), treasury);
-        assertEq(escrow.PROTOCOL_FEE_BPS(), 250);
+        assertEq(escrow.PROTOCOL_FEE_BPS(), 2000);
         assertEq(escrow.MIN_AMOUNT(), 1000);
         assertEq(escrow.MIN_DEADLINE(), 1 hours);
     }
@@ -606,7 +606,7 @@ contract NastarTest is Test {
         vm.prank(judge);
         escrow.resolveDisputeWithJudge(dealId, 8000, "Delivery matches requirements. Minor issues noted.");
 
-        uint256 fee = (10e6 * 250) / 10000;
+        uint256 fee = (10e6 * 2000) / 10000;
         uint256 remaining = 10e6 - fee;
         assertApproxEqAbs(usdc.balanceOf(bob) - bobBefore, (remaining * 8000) / 10000, 1);
         assertApproxEqAbs(usdc.balanceOf(alice) - aliceBefore, (remaining * 2000) / 10000, 1);
@@ -623,7 +623,7 @@ contract NastarTest is Test {
         vm.prank(judge);
         escrow.resolveDisputeWithJudge(dealId, 0, "Delivery does not match task description.");
 
-        uint256 fee = (10e6 * 250) / 10000;
+        uint256 fee = (10e6 * 2000) / 10000;
         uint256 remaining = 10e6 - fee;
         assertApproxEqAbs(usdc.balanceOf(alice), 1000e6 - 10e6 + remaining, 1);
         assertEq(usdc.balanceOf(bob), 0);

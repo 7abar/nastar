@@ -18,8 +18,8 @@ export const celoAlfajores = defineChain({
 
 // ── Contract addresses ────────────────────────────────────────────────────────
 export const CONTRACTS = {
-  SERVICE_REGISTRY: "0xB36454609b2bdaf2b688228492e23F3DddAE7206" as `0x${string}`,
-  NASTAR_ESCROW: "0xAE17AaccD135BD434E13990Dd2fAAA743f32b1e1" as `0x${string}`,
+  SERVICE_REGISTRY: "0x85f069A3153B2b3F6910C292369C3d559b149228" as `0x${string}`,
+  NASTAR_ESCROW: "0x77D6d32f1b8Cf64bFFF366C9b985af5C10bDd732" as `0x${string}`,
   IDENTITY_REGISTRY: "0x8004A818BFB912233c491871b3d84c89A494BD9e" as `0x${string}`,
 } as const;
 
