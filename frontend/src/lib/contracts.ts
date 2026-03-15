@@ -28,9 +28,9 @@ export const celoSepoliaCustom = defineChain({
 });
 
 export const CONTRACTS = {
-  SERVICE_REGISTRY: "0xF87bf96823517AC497808E563ED050fD736309f9" as `0x${string}`,
-  NASTAR_ESCROW: "0xE0D52EAadBA61c56731875cD6a23D8E84763D32F" as `0x${string}`,
-  IDENTITY_REGISTRY: "0x8004A818BFB912233c491871b3d84c89A494BD9e" as `0x${string}`,
+  SERVICE_REGISTRY: "0x8117e9bea366df4737f5acb09b03a1885e433c79" as `0x${string}`,
+  NASTAR_ESCROW: "0x9ea23a3b8579cffff9a9a2921ba93b3562bb4a2c" as `0x${string}`,
+  IDENTITY_REGISTRY: "0xa142c78a0a04de296cc463362d251e782cf8583e" as `0x${string}`,
   MOCK_USDC: "0x93C86be298bcF530E183954766f103B061BF64Ef" as `0x${string}`,
 } as const;
 

@@ -7,6 +7,65 @@ import { getStats as fetchStats, getLeaderboard, type Stats, type LeaderboardEnt
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://api-production-a473.up.railway.app";
 
+const STATUS_LABELS: Record<number, { label: string; color: string }> = {
+  0: { label: "Created", color: "bg-blue-400" },
+  1: { label: "Accepted", color: "bg-yellow-400" },
+  2: { label: "Delivered", color: "bg-purple-400" },
+  3: { label: "Completed", color: "bg-green-400" },
+  4: { label: "Disputed", color: "bg-red-400" },
+  5: { label: "Refunded", color: "bg-slate-400" },
+  7: { label: "Resolved", color: "bg-[#F4C430]" },
+};
+
+function LiveActivityFeed() {
+  const [deals, setDeals] = useState<any[]>([]);
+
+  useEffect(() => {
+    async function loadDeals() {
+      try {
+        const res = await fetch(`${API_URL}/deals?limit=6`);
+        if (res.ok) {
+          const data = await res.json();
+          setDeals(data.deals || data || []);
+        }
+      } catch {}
+    }
+    loadDeals();
+    const t = setInterval(loadDeals, 30000);
+    return () => clearInterval(t);
+  }, []);
+
+  if (deals.length === 0) return null;
+
+  return (
+    <div className="max-w-3xl mx-auto">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+          <span className="text-[#A1A1A1]/50 text-xs uppercase tracking-wider">Live Activity</span>
+        </div>
+        <Link href="/deals" className="text-[#A1A1A1]/30 text-xs hover:text-[#F4C430] transition">View all</Link>
+      </div>
+      <div className="space-y-1.5">
+        {deals.slice(0, 6).map((deal: any, i: number) => {
+          const status = STATUS_LABELS[Number(deal.status)] || { label: "Unknown", color: "bg-white/20" };
+          const amount = deal.amount ? (Number(deal.amount) / 1e18).toFixed(1) : "?";
+          const task = deal.taskDescription || "Agent task";
+          const short = task.length > 50 ? task.slice(0, 50) + "..." : task;
+          return (
+            <div key={i} className="flex items-center gap-3 px-4 py-2.5 rounded-lg bg-white/[0.02] border border-white/[0.04] hover:border-white/[0.08] transition">
+              <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${status.color}`} />
+              <span className="text-[#F5F5F5] text-sm flex-1 truncate">{short}</span>
+              <span className="text-[#A1A1A1]/40 text-xs flex-shrink-0">{status.label}</span>
+              <span className="text-[#F4C430] text-xs font-mono flex-shrink-0">${amount}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function HomePage() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [topAgents, setTopAgents] = useState<LeaderboardEntry[]>([]);
@@ -73,7 +132,7 @@ export default function HomePage() {
         </div>
 
         {/* Live stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 max-w-2xl mx-auto">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 max-w-2xl mx-auto mb-10">
           {[
             { label: "Protocol Revenue", value: `$${loading ? "--" : revenue.toFixed(2)}`, accent: true },
             { label: "Completed Deals", value: loading ? "--" : String(stats?.totalCompletedDeals || stats?.totalDeals || 0) },
@@ -86,6 +145,9 @@ export default function HomePage() {
             </div>
           ))}
         </div>
+
+        {/* Live activity feed */}
+        <LiveActivityFeed />
       </section>
 
       {/* ═══ THREE MARKETS ═══ */}
