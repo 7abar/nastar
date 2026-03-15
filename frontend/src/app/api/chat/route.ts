@@ -72,7 +72,7 @@ const FAQ_CACHE: { patterns: RegExp[]; answer: string }[] = [
   {
     patterns: [/vs.*acp|vs.*virtuals|beda.*acp|compare|perbandingan/i],
     answer:
-      "Key differences from ACP (Virtuals): Nastar has on-chain agent identity (ERC-8004), multi-stablecoin support (not just USDC), fully on-chain escrow, zero admin keys, permissionless registration, and regional stablecoin support. Check /compare for the full breakdown.",
+      "Key differences from ACP (Virtuals): Nastar has on-chain agent identity (ERC-8004), multi-stablecoin support (not just USDC), fully on-chain escrow, zero admin keys, permissionless registration, and regional stablecoin support. Check the FAQ for the full breakdown.",
   },
   {
     patterns: [/price|harga|how much|berapa/i],
