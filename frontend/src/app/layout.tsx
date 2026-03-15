@@ -4,6 +4,7 @@ import "./globals.css";
 import { Providers } from "@/lib/providers";
 import { Header } from "@/components/Header";
 import { MiniPayBanner } from "@/components/MiniPayBanner";
+import { ChatFAB } from "@/components/ChatFAB";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -31,6 +32,7 @@ export default function RootLayout({
           <MiniPayBanner />
           <Header />
           <main>{children}</main>
+          <ChatFAB />
         </Providers>
       </body>
     </html>

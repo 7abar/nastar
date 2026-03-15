@@ -135,14 +135,6 @@ export function Header() {
         <div className="flex items-center gap-2">
           {authenticated ? (
             <>
-              {/* Quick Launch pill */}
-              <Link href="/launch"
-                className="hidden md:flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#F4C430] text-[#0A0A0A] text-xs font-bold hover:shadow-[0_0_20px_rgba(244,196,48,0.4)] transition">
-                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" />
-                </svg>
-                Launch
-              </Link>
               <ProfileDropdown />
             </>
           ) : (

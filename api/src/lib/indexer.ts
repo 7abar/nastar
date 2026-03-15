@@ -265,7 +265,7 @@ function computeStats() {
   });
 
   stats = {
-    totalRevenue: formatUnits(totalRevenue, 6),
+    totalRevenue: formatUnits(totalRevenue, 18),
     totalRevenueRaw: totalRevenue,
     totalDeals: deals.length,
     totalCompletedDeals: totalCompleted,
