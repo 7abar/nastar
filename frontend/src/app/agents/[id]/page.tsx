@@ -89,7 +89,7 @@ export default function AgentDetailPage() {
   const [showKey, setShowKey] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"reviews" | "transactions">("reviews");
-  const [storedAgent, setStoredAgent] = useState<{ name: string; description: string | null; avatar: string | null } | null>(null);
+  const [storedAgent, setStoredAgent] = useState<{ name: string; description: string | null; avatar: string | null; agent_wallet: string | null } | null>(null);
   const [reputation, setReputation] = useState<{ score: number; tier: string } | null>(null);
 
   useEffect(() => {
@@ -140,7 +140,7 @@ export default function AgentDetailPage() {
         try {
           const { data } = await supabase
             .from("registered_agents")
-            .select("name, description, avatar")
+            .select("name, description, avatar, agent_wallet")
             .eq("agent_nft_id", agentId)
             .single();
           if (data) { setStoredAgent(data); foundStored = true; }
@@ -149,10 +149,10 @@ export default function AgentDetailPage() {
           try {
             const { data } = await supabase
               .from("hosted_agents")
-              .select("name, description")
+              .select("name, description, agent_wallet")
               .eq("agent_nft_id", agentId)
               .single();
-            if (data) setStoredAgent({ ...data, avatar: null });
+            if (data) setStoredAgent({ ...data, avatar: null, agent_wallet: data.agent_wallet || null });
           } catch {}
         }
       } catch (err) {
@@ -174,6 +174,7 @@ export default function AgentDetailPage() {
   }
 
   if (onChainAgent) {
+    const agentAddress = storedAgent?.agent_wallet || onChainAgent.address;
     const tags = getTagsFromServices(onChainAgent.services);
     const minPrice = Math.min(...onChainAgent.services.map((s) => parseFloat(s.pricePerCall) || 0));
     const maxPrice = Math.max(...onChainAgent.services.map((s) => parseFloat(s.pricePerCall) || 0));
@@ -224,9 +225,9 @@ export default function AgentDetailPage() {
               <div className="flex-1 min-w-0">
                 <h1 className="text-xl md:text-2xl font-bold">{storedAgent?.name || onChainAgent.name}</h1>
                 <div className="flex items-center gap-2 mt-1">
-                  <button onClick={() => copy(onChainAgent.address, "addr")} className="inline-flex items-center gap-1 text-[#A1A1A1]/50 text-xs font-mono hover:text-[#A1A1A1] transition">
+                  <button onClick={() => copy(agentAddress, "addr")} className="inline-flex items-center gap-1 text-[#A1A1A1]/50 text-xs font-mono hover:text-[#A1A1A1] transition">
                     <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 011.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 00-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 01-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 00-3.375-3.375h-1.5a1.125 1.125 0 01-1.125-1.125v-1.5a3.375 3.375 0 00-3.375-3.375H9.75" /></svg>
-                    {onChainAgent.address.slice(0, 6)}...{onChainAgent.address.slice(-4)} {copied === "addr" ? "✓" : ""}
+                    {agentAddress.slice(0, 6)}...{agentAddress.slice(-4)} {copied === "addr" ? "✓" : ""}
                   </button>
                 </div>
                 <div className="flex items-center gap-2.5 mt-2.5 flex-wrap">
@@ -242,7 +243,7 @@ export default function AgentDetailPage() {
                         View Tx
                         <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" /></svg>
                       </a>
-                      <a href={`https://agentscan.info/agents/${onChainAgent.address}`} target="_blank" rel="noopener noreferrer"
+                      <a href={`https://agentscan.info/agents/${agentAddress}`} target="_blank" rel="noopener noreferrer"
                         className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-500/10 border border-green-500/30 text-green-400 text-xs font-medium hover:bg-green-500/20 transition">
                         8004scan
                         <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" /></svg>
@@ -263,7 +264,7 @@ export default function AgentDetailPage() {
                   className="px-6 py-2 rounded-full bg-[#F4C430] text-[#0A0A0A] text-sm font-bold hover:shadow-[0_0_15px_rgba(244,196,48,0.3)] transition text-center">
                   Hire
                 </a>
-                <a href={`https://celoscan.io/address/${onChainAgent.address}`} target="_blank" rel="noopener noreferrer"
+                <a href={`https://celoscan.io/address/${agentAddress}`} target="_blank" rel="noopener noreferrer"
                   className="px-6 py-2 rounded-full border border-white/[0.15] text-[#A1A1A1] text-sm hover:text-[#F5F5F5] hover:border-white/[0.3] transition text-center">
                   CeloScan
                 </a>
@@ -417,7 +418,7 @@ export default function AgentDetailPage() {
             <div className="rounded-xl glass-card divide-y divide-white/[0.06]">
               {[
                 { label: "ERC-8004 Token", value: `#${onChainAgent.agentId}`, link: `https://celoscan.io/address/${IDENTITY_REGISTRY}` },
-                { label: "Wallet", value: onChainAgent.address, mono: true },
+                { label: "Wallet", value: agentAddress, mono: true },
                 { label: "Registry", value: IDENTITY_REGISTRY.slice(0, 10) + "...", link: `https://celoscan.io/address/${IDENTITY_REGISTRY}`, mono: true },
                 { label: "Escrow", value: ESCROW.slice(0, 10) + "...", link: `https://celoscan.io/address/${ESCROW}`, mono: true },
                 { label: "Network", value: "Celo Mainnet" },
@@ -445,7 +446,7 @@ export default function AgentDetailPage() {
                 { label: "Profile", href: `/agents/${onChainAgent.agentId}`, value: `/agents/${onChainAgent.agentId}` },
                 { label: "Registration JSON", href: `/api/agent-registration/${onChainAgent.agentId}`, value: `/api/agent-registration/${onChainAgent.agentId}` },
                 { label: "Avatar", href: `/api/agent-avatar/${onChainAgent.agentId}`, value: `/api/agent-avatar/${onChainAgent.agentId}` },
-                { label: "CeloScan", href: `https://celoscan.io/address/${onChainAgent.address}`, value: "View on explorer" },
+                { label: "CeloScan", href: `https://celoscan.io/address/${agentAddress}`, value: "View on explorer" },
               ].map((ep) => (
                 <div key={ep.label} className="flex justify-between items-center px-4 py-3">
                   <span className="text-[#A1A1A1]/50 text-xs">{ep.label}</span>
