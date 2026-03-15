@@ -8,6 +8,7 @@ import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { celoSepoliaCustom, CONTRACTS, ESCROW_ABI } from "@/lib/contracts";
 import { getStoredAgents, type RegisteredAgent } from "@/lib/agents-api";
+import { supabase } from "@/lib/supabase";
 
 const client = createPublicClient({ chain: celoSepoliaCustom, transport: http() });
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://api-production-a473.up.railway.app";
@@ -34,14 +35,43 @@ interface UserProfile {
   socials: Record<string, SocialProfile>;
 }
 
-function loadProfile(addr: string): UserProfile {
+function loadProfileLocal(addr: string): UserProfile {
   try {
     const s = localStorage.getItem(`nastar-profile-${addr.toLowerCase()}`);
     if (s) return JSON.parse(s);
   } catch {}
   return { bio: "", displayName: "", avatar: "", socials: {} };
 }
-function saveProfile(addr: string, p: UserProfile) {
+
+async function loadProfileFromDB(addr: string): Promise<UserProfile | null> {
+  try {
+    const { data } = await supabase
+      .from("user_profiles")
+      .select("display_name, bio, avatar, socials")
+      .eq("wallet_address", addr.toLowerCase());
+    if (data && data.length > 0) {
+      return {
+        displayName: data[0].display_name || "",
+        bio: data[0].bio || "",
+        avatar: data[0].avatar || "",
+        socials: data[0].socials || {},
+      };
+    }
+  } catch {}
+  return null;
+}
+
+async function saveProfileToDB(addr: string, p: UserProfile) {
+  const row = {
+    wallet_address: addr.toLowerCase(),
+    display_name: p.displayName,
+    bio: p.bio,
+    avatar: p.avatar,
+    socials: p.socials,
+    updated_at: new Date().toISOString(),
+  };
+  await supabase.from("user_profiles").upsert(row, { onConflict: "wallet_address" });
+  // Also keep localStorage as cache
   localStorage.setItem(`nastar-profile-${addr.toLowerCase()}`, JSON.stringify(p));
 }
 
@@ -82,9 +112,17 @@ function SettingsPage() {
 
   useEffect(() => {
     if (address) {
-      const p = loadProfile(address);
-      setProfile(p);
-      setAvatarPreview(p.avatar || "");
+      // Load from localStorage first (instant), then override from DB
+      const local = loadProfileLocal(address);
+      setProfile(local);
+      setAvatarPreview(local.avatar || "");
+
+      loadProfileFromDB(address).then((db) => {
+        if (db) {
+          setProfile(db);
+          setAvatarPreview(db.avatar || "");
+        }
+      });
     }
   }, [address]);
 
@@ -116,11 +154,12 @@ function SettingsPage() {
     if (socialParam && address) {
       try {
         const socialData: SocialProfile = JSON.parse(decodeURIComponent(socialParam));
+        const current = loadProfileLocal(address);
         const newProfile = {
-          ...loadProfile(address),
-          socials: { ...loadProfile(address).socials, [socialData.platform]: socialData },
+          ...current,
+          socials: { ...current.socials, [socialData.platform]: socialData },
         };
-        saveProfile(address, newProfile);
+        saveProfileToDB(address, newProfile);
         setProfile(newProfile);
         router.replace("/settings", { scroll: false });
       } catch (err) {
@@ -142,11 +181,12 @@ function SettingsPage() {
         if (!res.ok) throw new Error("Verification failed");
         const socialData: SocialProfile = await res.json();
         if (address) {
+          const current = loadProfileLocal(address);
           const newProfile = {
-            ...loadProfile(address),
-            socials: { ...loadProfile(address).socials, Telegram: socialData },
+            ...current,
+            socials: { ...current.socials, Telegram: socialData },
           };
-          saveProfile(address, newProfile);
+          saveProfileToDB(address, newProfile);
           setProfile(newProfile);
         }
       } catch (err) {
@@ -202,9 +242,9 @@ function SettingsPage() {
     } catch {}
   }
 
-  function handleSave() {
+  async function handleSave() {
     if (!address) return;
-    saveProfile(address, profile);
+    await saveProfileToDB(address, profile);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   }
@@ -214,7 +254,7 @@ function SettingsPage() {
     delete newSocials[platform];
     const newProfile = { ...profile, socials: newSocials };
     setProfile(newProfile);
-    if (address) saveProfile(address, newProfile);
+    if (address) saveProfileToDB(address, newProfile);
   }
 
   const platforms = [
