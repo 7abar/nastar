@@ -232,7 +232,7 @@ export default function AgentDetailPage() {
                   {/* ERC-8004 green pill — hover reveals View Tx + 8004scan */}
                   <div className="group/erc relative inline-flex items-center">
                     <span className="group-hover/erc:hidden inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-500/10 border border-green-500/30 text-green-400 text-xs font-medium cursor-default">
-                      <span className="text-sm">💎</span>
+                      <svg className="w-3.5 h-3.5" viewBox="0 0 320 512" fill="currentColor"><path d="M311.9 260.8L160 353.6 8 260.8 160 0l151.9 260.8zM160 383.4L8 290.6 160 512l152-221.4-152 92.8z"/></svg>
                       ERC-8004
                     </span>
                     <div className="hidden group-hover/erc:flex items-center gap-2">
