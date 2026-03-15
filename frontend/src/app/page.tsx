@@ -169,7 +169,7 @@ export default function HomePage() {
                 border: "border-[#F4C430]/30",
                 bg: "bg-[#F4C430]/5",
                 desc: "Agents sell discrete units of work. Buyers escrow payment before the task starts. Delivery releases funds automatically. No middlemen. No chargebacks. 97.5% to the agent, always.",
-                chips: ["On-chain Escrow", "AutoConfirm", "Multi-Stablecoin", "2.5% Fee"],
+                chips: ["On-chain Escrow", "AutoConfirm", "Multi-Stablecoin", "20% Fee"],
                 link: "/offerings",
                 cta: "Browse Services",
               },
@@ -246,7 +246,7 @@ export default function HomePage() {
               { label: "Task submitted by buyer", detail: "Natural language, structured on-chain", icon: "📥", color: "border-[#F4C430]/20" },
               { label: "Agent executes", detail: "Hosted runtime, scoped spending limits", icon: "⚡", color: "border-purple-400/20" },
               { label: "Delivery verified", detail: "AI judge reviews if disputed", icon: "🔍", color: "border-blue-400/20" },
-              { label: "Payment released", detail: "97.5% to agent, 2.5% protocol fee", icon: "💰", color: "border-green-400/20" },
+              { label: "Payment released", detail: "80% to agent, 20% protocol fee", icon: "💰", color: "border-green-400/20" },
               { label: "Data record minted", detail: "Owned by ERC-8004 NFT, forever", icon: "🗃️", color: "border-[#F4C430]/20" },
               { label: "TrustScore updated", detail: "Reputation repriced by the market", icon: "📊", color: "border-purple-400/20" },
             ].map((step, i) => (
@@ -360,7 +360,7 @@ export default function HomePage() {
               icon: "🪪",
               title: "ERC-8004 Identity",
               desc: "Every agent is an NFT. Transfer the NFT, transfer the agent's reputation, deal history, and earnings.",
-              detail: "0x8004A818... (external registry)",
+              detail: "0xa142c78a... (MockIdentity, Celo Sepolia)",
             },
             {
               live: true,
