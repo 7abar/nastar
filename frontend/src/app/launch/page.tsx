@@ -492,9 +492,47 @@ export default function LaunchPage() {
 
           <div className="space-y-6">
 
-            {/* Icon + Name row */}
-            <div className="space-y-3">
-              <div>
+            {/* Avatar (left) + Name (right) — matches agent profile layout */}
+            <div className="flex items-start gap-5">
+              {/* Avatar upload */}
+              <div className="shrink-0">
+                <button type="button"
+                  onClick={() => document.getElementById("avatar-upload")?.click()}
+                  className={`w-20 h-20 rounded-full border-2 border-dashed flex items-center justify-center overflow-hidden transition ${
+                    config.avatarPreview
+                      ? "border-green-500/40"
+                      : "border-white/[0.15] hover:border-[#F4C430]/40"
+                  }`}>
+                  {config.avatarPreview ? (
+                    <img src={config.avatarPreview} alt="avatar" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="text-center">
+                      <span className="text-2xl block">📷</span>
+                      <span className="text-[#A1A1A1]/30 text-[8px]">Upload</span>
+                    </div>
+                  )}
+                </button>
+                <input id="avatar-upload" type="file" accept="image/*" className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    if (file.size > 2 * 1024 * 1024) { setError("Image must be under 2MB"); return; }
+                    (window as any).__nastarAvatarFile = file;
+                    const reader = new FileReader();
+                    reader.onload = () => setConfig((c) => ({ ...c, avatarPreview: reader.result as string }));
+                    reader.readAsDataURL(file);
+                  }}
+                />
+                {config.avatarPreview && (
+                  <button type="button" onClick={() => {
+                    setConfig((c) => ({ ...c, avatarPreview: "" }));
+                    (window as any).__nastarAvatarFile = null;
+                  }} className="text-red-400/50 text-[10px] mt-1 hover:text-red-400 block mx-auto">Remove</button>
+                )}
+              </div>
+
+              {/* Name + hint */}
+              <div className="flex-1 min-w-0">
                 <label className="text-[#A1A1A1]/60 text-xs mb-1.5 block">Agent Name *</label>
                 <input
                   value={config.name}
@@ -502,52 +540,7 @@ export default function LaunchPage() {
                   placeholder={`e.g. ${tmpl.name}`}
                   className="w-full px-3 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-[#F5F5F5] placeholder-[#A1A1A1]/30 focus:outline-none focus:border-[#F4C430]/40 text-sm transition"
                 />
-              </div>
-              <div>
-                <label className="text-[#A1A1A1]/60 text-xs mb-2 block">Agent Avatar *</label>
-                <div className="flex items-center gap-4">
-                  <button type="button"
-                    onClick={() => document.getElementById("avatar-upload")?.click()}
-                    className={`w-20 h-20 rounded-2xl border-2 border-dashed flex items-center justify-center overflow-hidden transition shrink-0 ${
-                      config.avatarPreview
-                        ? "border-[#F4C430]/40"
-                        : "border-white/[0.15] hover:border-[#F4C430]/40"
-                    }`}>
-                    {config.avatarPreview ? (
-                      <img src={config.avatarPreview} alt="avatar" className="w-full h-full object-cover rounded-xl" />
-                    ) : (
-                      <div className="text-center">
-                        <span className="text-2xl block">📷</span>
-                        <span className="text-[#A1A1A1]/30 text-[9px]">Upload</span>
-                      </div>
-                    )}
-                  </button>
-                  <input id="avatar-upload" type="file" accept="image/*" className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (!file) return;
-                      if (file.size > 2 * 1024 * 1024) {
-                        setError("Image must be under 2MB");
-                        return;
-                      }
-                      // Store the File object for later upload
-                      (window as any).__nastarAvatarFile = file;
-                      const reader = new FileReader();
-                      reader.onload = () => setConfig((c) => ({ ...c, avatarPreview: reader.result as string }));
-                      reader.readAsDataURL(file);
-                    }}
-                  />
-                  <div className="text-[#A1A1A1]/40 text-xs">
-                    <p>JPG, PNG, or GIF</p>
-                    <p>Max 2MB, square recommended</p>
-                    {config.avatarPreview && (
-                      <button type="button" onClick={() => {
-                        setConfig((c) => ({ ...c, avatarPreview: "" }));
-                        (window as any).__nastarAvatarFile = null;
-                      }} className="text-red-400/60 text-[10px] mt-1 hover:text-red-400">Remove</button>
-                    )}
-                  </div>
-                </div>
+                <p className="text-[#A1A1A1]/30 text-[10px] mt-1.5">JPG, PNG, or GIF. Max 2MB, square recommended.</p>
               </div>
             </div>
 
