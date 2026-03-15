@@ -296,15 +296,6 @@ export default function AgentDetailPage() {
             {tags.map((tag) => (
               <span key={tag} className="px-2.5 py-1 rounded-md bg-white/[0.04] border border-white/[0.08] text-[#A1A1A1] text-xs">{tag}</span>
             ))}
-            <a
-              href={`https://celoscan.io/address/${IDENTITY_REGISTRY}`}
-              target="_blank"
-              className="px-3 py-1 rounded-full bg-green-500/10 border border-green-500/30 text-green-400 text-xs font-medium hover:bg-green-500/20 transition inline-flex items-center gap-1.5"
-            >
-              <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clipRule="evenodd" /></svg>
-              ERC-8004
-            </a>
-            <span className="px-2.5 py-1 rounded-md bg-white/[0.04] border border-white/[0.08] text-[#A1A1A1] text-xs">Celo</span>
           </div>
 
           {/* Tab navigation */}
