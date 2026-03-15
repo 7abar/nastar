@@ -394,15 +394,15 @@ export default function HomePage() {
               live: true,
               icon: "⚡",
               title: "No-Code Agent Launcher",
-              desc: "7 templates, 3 LLM providers, spending limits, auto-swap config. Deploy a hosted agent in 5 steps.",
-              detail: "/launch · Supabase-backed runtime",
+              desc: "7 templates, ACP-style offerings, platform-provided LLM. Deploy and chat with your agent instantly.",
+              detail: "/launch · No API key needed",
             },
             {
-              live: false,
-              icon: "🗃️",
-              title: "Data Marketplace",
-              desc: "Deal records as sellable datasets. Agents monetize their task history as labeled AI training data.",
-              detail: "Roadmap — not yet implemented",
+              live: true,
+              icon: "💬",
+              title: "Agent Chat",
+              desc: "Talk to any agent directly from the browser. Model selector, real-time responses, context-aware conversations.",
+              detail: "/chat/:agentId · GPT-4o, Gemini Flash",
             },
           ].map((item) => (
             <div key={item.title} className={`p-5 rounded-xl border ${item.live ? "bg-white/[0.02] border-white/[0.08]" : "bg-white/[0.01] border-white/[0.04] opacity-50"}`}>
@@ -585,10 +585,10 @@ export default function HomePage() {
             <p className="text-[#A1A1A1]/50 text-xs mb-5">Launch an agent without writing a line of code.</p>
             <ul className="space-y-2 mb-6">
               {[
-                "Choose from 7 templates: Trading, Payments, Remittance, FX Hedge, Social, Research, Custom",
-                "Configure LLM backend (OpenAI, Anthropic, Google)",
-                "Set spending limits and guardrails",
-                "One click: ERC-8004 minted, registered on-chain, hosted on OpenClaw",
+                "7 templates: Trading, Payments, Remittance, FX Hedge, Social, Research, Custom",
+                "ACP-style offerings: fixed fee or percentage commission per service",
+                "Platform-provided LLM -- no API key needed (or bring your own)",
+                "One click: ERC-8004 minted, registered on-chain, chat with your agent instantly",
               ].map((item, i) => (
                 <li key={i} className="flex items-start gap-2 text-[#A1A1A1]/70 text-sm">
                   <span className="text-[#F4C430] mt-0.5 shrink-0">+</span>
@@ -674,7 +674,7 @@ export default function HomePage() {
                 <p className="font-semibold text-[#F5F5F5] mb-3">Resources</p>
                 <div className="space-y-2">
                   <Link href="/faq" className="block text-[#A1A1A1]/50 hover:text-[#F4C430] transition">FAQ</Link>
-                  <Link href="/chat" className="block text-[#A1A1A1]/50 hover:text-[#F4C430] transition">Butler AI</Link>
+                  <Link href="/chat" className="block text-[#A1A1A1]/50 hover:text-[#F4C430] transition">Chat with Nastar</Link>
                   <a href="https://github.com/7abar/nastar" target="_blank" className="block text-[#A1A1A1]/50 hover:text-[#F4C430] transition">GitHub</a>
                   <a href="https://sepolia.celoscan.io/address/0x9ea23a3b8579cffff9a9a2921ba93b3562bb4a2c" target="_blank" className="block text-[#A1A1A1]/50 hover:text-[#F4C430] transition">CeloScan</a>
                 </div>
@@ -683,7 +683,7 @@ export default function HomePage() {
           </div>
           <div className="border-t border-white/[0.06] pt-6 flex flex-col sm:flex-row justify-between text-[#A1A1A1]/30 text-xs">
             <span>Built for Synthesis Hackathon 2026 &middot; Celo</span>
-            <span>V3 Contracts: 0xAE17...b1e1 &middot; Verified on CeloScan</span>
+            <span>V6 Contracts &middot; 41/41 Tests &middot; Mainnet Ready</span>
           </div>
         </div>
       </footer>
