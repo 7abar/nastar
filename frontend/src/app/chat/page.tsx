@@ -62,8 +62,12 @@ function ChatPage() {
   const [nastarWallet, setNastarWallet] = useState<string | null>(null);
   const [walletBalances, setWalletBalances] = useState<Record<string, string>>({});
   const [showWalletPanel, setShowWalletPanel] = useState(false);
-  const [depositMode, setDepositMode] = useState(false);
+  const [walletMode, setWalletMode] = useState<"idle" | "deposit" | "withdraw">("idle");
   const [copied, setCopied] = useState(false);
+  const [withdrawTo, setWithdrawTo] = useState("");
+  const [withdrawAmount, setWithdrawAmount] = useState("");
+  const [withdrawToken, setWithdrawToken] = useState("cUSD");
+  const [withdrawing, setWithdrawing] = useState(false);
   const messagesEnd = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const searchParams = useSearchParams();
@@ -485,7 +489,7 @@ function ChatPage() {
       {/* Wallet Panel Overlay */}
       {showWalletPanel && nastarWallet && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
-          <div className="absolute inset-0 bg-black/60" onClick={() => { setShowWalletPanel(false); setDepositMode(false); }} />
+          <div className="absolute inset-0 bg-black/60" onClick={() => { setShowWalletPanel(false); setWalletMode("idle"); }} />
           <div className="relative w-full max-w-sm mx-4 mb-4 sm:mb-0 rounded-2xl bg-[#111] border border-white/[0.1] shadow-2xl overflow-hidden">
             {/* Header */}
             <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.06]">
@@ -506,14 +510,14 @@ function ChatPage() {
                   </p>
                 </div>
               </div>
-              <button onClick={() => { setShowWalletPanel(false); setDepositMode(false); }} className="text-[#A1A1A1]/40 hover:text-white transition text-lg">✕</button>
+              <button onClick={() => { setShowWalletPanel(false); setWalletMode("idle"); }} className="text-[#A1A1A1]/40 hover:text-white transition text-lg">✕</button>
             </div>
 
             {/* Action Buttons */}
             <div className="flex gap-3 px-5 py-4">
               <button
-                onClick={() => setDepositMode(true)}
-                className="flex-1 flex flex-col items-center gap-1.5 py-3 rounded-xl bg-[#F4C430]/10 border border-[#F4C430]/20 text-[#F4C430] hover:bg-[#F4C430]/20 transition"
+                onClick={() => setWalletMode(walletMode === "deposit" ? "idle" : "deposit")}
+                className={`flex-1 flex flex-col items-center gap-1.5 py-3 rounded-xl border transition ${walletMode === "deposit" ? "bg-[#F4C430]/20 border-[#F4C430]/40 text-[#F4C430]" : "bg-[#F4C430]/10 border-[#F4C430]/20 text-[#F4C430] hover:bg-[#F4C430]/20"}`}
               >
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 13.5L12 21m0 0l-7.5-7.5M12 21V3" />
@@ -521,8 +525,8 @@ function ChatPage() {
                 <span className="text-xs font-medium">Deposit</span>
               </button>
               <button
-                onClick={() => addMsg({ role: "assistant", text: `To withdraw, send stablecoins from your Nastar Wallet to any address on Celo.\n\nYour wallet: \`${nastarWallet}\`\n\nWithdrawal is coming soon via the butler. For now, contact support.` })}
-                className="flex-1 flex flex-col items-center gap-1.5 py-3 rounded-xl bg-white/[0.04] border border-white/[0.08] text-[#A1A1A1] hover:text-white hover:border-white/[0.15] transition"
+                onClick={() => setWalletMode(walletMode === "withdraw" ? "idle" : "withdraw")}
+                className={`flex-1 flex flex-col items-center gap-1.5 py-3 rounded-xl border transition ${walletMode === "withdraw" ? "bg-red-500/20 border-red-500/40 text-red-400" : "bg-white/[0.04] border-white/[0.08] text-[#A1A1A1] hover:text-white hover:border-white/[0.15]"}`}
               >
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 10.5L12 3m0 0l7.5 7.5M12 3v18" />
@@ -532,7 +536,7 @@ function ChatPage() {
             </div>
 
             {/* Deposit Mode */}
-            {depositMode && (
+            {walletMode === "deposit" && (
               <div className="px-5 pb-4">
                 <div className="p-4 rounded-xl bg-[#F4C430]/5 border border-[#F4C430]/20">
                   <p className="text-[#F4C430] text-xs font-medium mb-2">Send stablecoins on Celo to:</p>
@@ -547,6 +551,89 @@ function ChatPage() {
                   </div>
                   <p className="text-[#A1A1A1]/40 text-[10px] mt-2">Supported: cUSD, USDC, USDT on Celo (Chain ID: 42220)</p>
                 </div>
+              </div>
+            )}
+
+            {/* Withdraw Mode */}
+            {walletMode === "withdraw" && (
+              <div className="px-5 pb-4 space-y-3">
+                <div>
+                  <label className="text-[#A1A1A1]/60 text-xs mb-1 block">Token</label>
+                  <div className="flex gap-2">
+                    {["cUSD", "USDC", "USDT", "CELO"].map((t) => (
+                      <button
+                        key={t}
+                        onClick={() => setWithdrawToken(t)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${withdrawToken === t ? "bg-[#F4C430]/20 text-[#F4C430] border border-[#F4C430]/40" : "bg-white/[0.04] text-[#A1A1A1] border border-white/[0.08] hover:text-white"}`}
+                      >
+                        {t}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[#A1A1A1]/60 text-xs mb-1 block">Amount</label>
+                  <div className="flex gap-2">
+                    <input
+                      value={withdrawAmount}
+                      onChange={(e) => setWithdrawAmount(e.target.value)}
+                      placeholder="0.00"
+                      className="flex-1 px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-[#F5F5F5] text-sm focus:outline-none focus:border-[#F4C430]/30"
+                    />
+                    <button
+                      onClick={() => setWithdrawAmount(walletBalances[withdrawToken] || "0")}
+                      className="px-2 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-[#A1A1A1] text-xs hover:text-[#F4C430] transition"
+                    >
+                      MAX
+                    </button>
+                  </div>
+                  <p className="text-[#A1A1A1]/30 text-[10px] mt-1">Available: {parseFloat(walletBalances[withdrawToken] || "0").toFixed(4)} {withdrawToken}</p>
+                </div>
+                <div>
+                  <label className="text-[#A1A1A1]/60 text-xs mb-1 block">To Address</label>
+                  <input
+                    value={withdrawTo}
+                    onChange={(e) => setWithdrawTo(e.target.value)}
+                    placeholder="0x..."
+                    className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-[#F5F5F5] text-sm font-mono focus:outline-none focus:border-[#F4C430]/30"
+                  />
+                </div>
+                <button
+                  onClick={async () => {
+                    if (!withdrawTo || !withdrawAmount || withdrawing) return;
+                    setWithdrawing(true);
+                    try {
+                      const decimals = withdrawToken === "USDC" || withdrawToken === "USDT" ? 6 : 18;
+                      const raw = BigInt(Math.floor(parseFloat(withdrawAmount) * (10 ** decimals))).toString();
+                      const API = process.env.NEXT_PUBLIC_API_URL || "https://api.nastar.fun";
+                      const r = await fetch(`${API}/v1/wallet/withdraw`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ ownerAddress: wallets[0]?.address, to: withdrawTo, token: withdrawToken, amount: raw }),
+                      });
+                      const d = await r.json();
+                      if (d.success) {
+                        setShowWalletPanel(false);
+                        setWalletMode("idle");
+                        addMsg({ role: "assistant", text: `Withdrawn ${d.amount} ${d.token} to ${d.to.slice(0, 6)}...${d.to.slice(-4)}.\nTX: ${d.txHash}` });
+                        setWithdrawTo(""); setWithdrawAmount("");
+                        // Refresh balances
+                        const balRes = await fetch(`${API}/v1/wallet/balance?ownerAddress=${wallets[0]?.address}`);
+                        const balData = await balRes.json();
+                        if (balData.balances) setWalletBalances(balData.balances);
+                      } else {
+                        addMsg({ role: "assistant", text: `Withdraw failed: ${d.error}` });
+                      }
+                    } catch (e: any) {
+                      addMsg({ role: "assistant", text: `Withdraw error: ${e.message}` });
+                    }
+                    setWithdrawing(false);
+                  }}
+                  disabled={!withdrawTo || !withdrawAmount || withdrawing}
+                  className="w-full py-2.5 rounded-xl bg-red-500/20 border border-red-500/30 text-red-400 text-sm font-medium hover:bg-red-500/30 transition disabled:opacity-30"
+                >
+                  {withdrawing ? "Sending..." : `Withdraw ${withdrawAmount || "0"} ${withdrawToken}`}
+                </button>
               </div>
             )}
 
