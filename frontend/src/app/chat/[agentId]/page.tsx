@@ -96,7 +96,8 @@ export default function AgentChatPage() {
           if (data && data.length > 0 && data[0].avatar) {
             setAgentAvatar(data[0].avatar);
           }
-      } catch {}
+        } catch {}
+      }
     }
     if (agentId) loadAgent();
   }, [agentId]);
