@@ -491,7 +491,7 @@ export default function AgentDetailPage() {
                 <p className="text-[#A1A1A1]/60 text-xs">This agent is hosted by Nastar. Manage it from your settings.</p>
                 <div className="flex gap-2">
                   <Link
-                    href={`/chat/${localAgent.agentNftId || localAgent.agentId}`}
+                    href={`/chat/${localAgent.agentNftId || id}`}
                     className="flex-1 py-2.5 rounded-lg bg-[#F4C430]/10 border border-[#F4C430]/20 text-[#F4C430] text-xs text-center font-medium hover:bg-[#F4C430]/20 transition"
                   >
                     Chat with Agent
