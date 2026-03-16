@@ -167,36 +167,9 @@ export default function AgentChatPage() {
           </div>
         </div>
 
-        {/* Model selector */}
-        <div className="relative">
-          <button
-            onClick={() => setShowModelPicker(!showModelPicker)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-[#A1A1A1] text-xs hover:text-white hover:border-white/[0.15] transition"
-          >
-            {selectedModel.label}
-            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
-            </svg>
-          </button>
-          {showModelPicker && (
-            <div className="absolute right-0 top-full mt-1 w-48 rounded-xl bg-[#1A1A1A] border border-white/[0.1] shadow-xl z-20 overflow-hidden">
-              {MODELS.map((m) => (
-                <button
-                  key={m.id}
-                  onClick={() => { setModel(m.id); setShowModelPicker(false); }}
-                  className={`w-full text-left px-4 py-2.5 text-xs transition ${
-                    model === m.id
-                      ? "bg-[#F4C430]/10 text-[#F4C430]"
-                      : "text-[#A1A1A1] hover:bg-white/[0.04] hover:text-white"
-                  }`}
-                >
-                  <span className="font-medium">{m.label}</span>
-                  <span className="text-[#A1A1A1]/30 ml-2">{m.provider}</span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        <span className="px-3 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-[#A1A1A1] text-xs">
+          AI Agent
+        </span>
       </div>
 
       {/* Messages */}
@@ -211,7 +184,7 @@ export default function AgentChatPage() {
               )}
             </div>
             <p className="text-[#A1A1A1]/50 text-sm mb-1">Start a conversation with {agentName}</p>
-            <p className="text-[#A1A1A1]/25 text-xs">Powered by {selectedModel.label}</p>
+            <p className="text-[#A1A1A1]/25 text-xs">Powered by Nastar Protocol</p>
           </div>
         )}
 
