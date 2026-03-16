@@ -91,6 +91,7 @@ export default function AgentDetailPage() {
   const [activeTab, setActiveTab] = useState<"reviews" | "transactions">("reviews");
   const [storedAgent, setStoredAgent] = useState<{ name: string; description: string | null; avatar: string | null; agent_wallet: string | null } | null>(null);
   const [reputation, setReputation] = useState<{ score: number; tier: string } | null>(null);
+  const [metadata, setMetadata] = useState<any>(null);
 
   useEffect(() => {
     async function load() {
@@ -133,6 +134,12 @@ export default function AgentDetailPage() {
         try {
           const repRes = await fetch(`${API_URL}/v1/reputation/${agentId}`);
           if (repRes.ok) setReputation(await repRes.json());
+        } catch {}
+
+        // Fetch rich metadata (OASF, ERC-8004)
+        try {
+          const metaRes = await fetch(`${API_URL}/api/agent/${agentId}/metadata`);
+          if (metaRes.ok) setMetadata(await metaRes.json());
         } catch {}
 
         // Fetch stored agent metadata from Supabase
@@ -212,8 +219,8 @@ export default function AgentDetailPage() {
               {/* Avatar */}
               <div className="relative shrink-0">
                 <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-gradient-to-br from-green-500/20 to-emerald-500/10 border-2 border-green-500/30 flex items-center justify-center overflow-hidden">
-                  {storedAgent?.avatar && storedAgent.avatar.startsWith("http") ? (
-                    <img src={storedAgent.avatar} alt="" className="w-full h-full object-cover" />
+                  {(storedAgent?.avatar || metadata?.image)?.startsWith("http") ? (
+                    <img src={storedAgent?.avatar || metadata?.image} alt="" className="w-full h-full object-cover" />
                   ) : (
                     <span className="text-3xl font-bold text-green-400">{onChainAgent.name.charAt(0).toUpperCase()}</span>
                   )}
@@ -246,9 +253,9 @@ export default function AgentDetailPage() {
                         View Tx
                         <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" /></svg>
                       </a>
-                      <a href={`https://agentscan.info/agents/${agentAddress}`} target="_blank" rel="noopener noreferrer"
+                      <a href={metadata?.agentscan_url || `https://agentscan.info/agents/${id}`} target="_blank" rel="noopener noreferrer"
                         className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-500/10 border border-green-500/30 text-green-400 text-xs font-medium hover:bg-green-500/20 transition">
-                        8004scan
+                        Agentscan
                         <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" /></svg>
                       </a>
                     </div>
@@ -296,12 +303,42 @@ export default function AgentDetailPage() {
             ))}
           </div>
 
-          {/* Tags */}
+          {/* Tags from metadata or services */}
           <div className="flex flex-wrap gap-2 mb-6">
-            {tags.map((tag) => (
+            {(metadata?.tags || tags).map((tag: string) => (
               <span key={tag} className="px-2.5 py-1 rounded-md bg-white/[0.04] border border-white/[0.08] text-[#A1A1A1] text-xs">{tag}</span>
             ))}
           </div>
+
+          {/* OASF Skills & Domains */}
+          {metadata?.services?.[0]?.skills && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+              <div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.08]">
+                <h3 className="text-[#F4C430] text-xs font-semibold uppercase tracking-wider mb-3">Skills (OASF v0.8.0)</h3>
+                <div className="space-y-1.5">
+                  {metadata.services[0].skills.map((skill: string) => (
+                    <div key={skill} className="flex items-center gap-2 text-xs text-[#A1A1A1]/70">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#F4C430]/40 shrink-0" />
+                      <span className="font-mono">{skill}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              {metadata.services[0].domains && (
+                <div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.08]">
+                  <h3 className="text-[#F4C430] text-xs font-semibold uppercase tracking-wider mb-3">Domains</h3>
+                  <div className="space-y-1.5">
+                    {metadata.services[0].domains.map((domain: string) => (
+                      <div key={domain} className="flex items-center gap-2 text-xs text-[#A1A1A1]/70">
+                        <span className="w-1.5 h-1.5 rounded-full bg-green-400/40 shrink-0" />
+                        <span className="font-mono">{domain}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Tab navigation */}
           <div className="flex gap-0 border-b border-white/[0.08] mb-6">
