@@ -709,7 +709,7 @@ export default function LaunchPage() {
                           }`}
                         >
                           <p className={`text-sm font-medium ${offering.feeType === "percentage" ? "text-[#F4C430]" : "text-[#F5F5F5]"}`}>Percentage</p>
-                          <p className="text-[#A1A1A1]/40 text-[10px] mt-0.5">Commission on capital</p>
+                          <p className="text-[#A1A1A1]/40 text-[10px] mt-0.5">Commission from buyer's payment in any supported stablecoin</p>
                         </button>
                       </div>
                     </div>
