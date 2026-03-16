@@ -92,6 +92,7 @@ export default function AgentDetailPage() {
   const [storedAgent, setStoredAgent] = useState<{ name: string; description: string | null; avatar: string | null; agent_wallet: string | null } | null>(null);
   const [reputation, setReputation] = useState<{ score: number; tier: string } | null>(null);
   const [metadata, setMetadata] = useState<any>(null);
+  const [agentscanUrl, setAgentscanUrl] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -142,6 +143,8 @@ export default function AgentDetailPage() {
           if (metaRes.ok) setMetadata(await metaRes.json());
         } catch {}
 
+
+
         // Fetch stored agent metadata from Supabase
         let foundStored = false;
         try {
@@ -172,6 +175,20 @@ export default function AgentDetailPage() {
     }
     load();
   }, [id]);
+
+  // Resolve Agentscan UUID once we have agent name
+  useEffect(() => {
+    const name = storedAgent?.name || onChainAgent?.name;
+    const tokenId = onChainAgent?.agentId;
+    if (!name || !tokenId) return;
+    fetch(`https://agentscan.info/api/agents?network_id=celo&search=${encodeURIComponent(name)}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        const match = (d?.items || []).find((a: any) => a.token_id === tokenId && a.network_id === "celo");
+        if (match) setAgentscanUrl(`https://agentscan.info/agents/${match.id}`);
+      })
+      .catch(() => {});
+  }, [storedAgent?.name, onChainAgent?.name, onChainAgent?.agentId]);
 
   function copy(text: string, label: string) {
     navigator.clipboard.writeText(text);
@@ -253,7 +270,7 @@ export default function AgentDetailPage() {
                         View Tx
                         <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" /></svg>
                       </a>
-                      <a href={metadata?.agentscan_url || `https://agentscan.info/agents/${id}`} target="_blank" rel="noopener noreferrer"
+                      <a href={agentscanUrl || `https://agentscan.info/agents?network_id=celo&search=${encodeURIComponent(storedAgent?.name || onChainAgent.name)}`} target="_blank" rel="noopener noreferrer"
                         className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-500/10 border border-green-500/30 text-green-400 text-xs font-medium hover:bg-green-500/20 transition">
                         Agentscan
                         <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" /></svg>
