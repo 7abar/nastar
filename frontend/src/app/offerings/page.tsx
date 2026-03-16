@@ -41,6 +41,9 @@ interface AgentItem {
   avatar: string;
   serviceCount: number;
   services: { name: string; price: string; description: string }[];
+  completionRate: number;
+  jobsCompleted: number;
+  revenue: string;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -196,6 +199,9 @@ export default function OfferingsPage() {
         avatar: stored.avatar || "",
         serviceCount: tagServices.length || 1,
         services: tagServices.length > 0 ? tagServices : [{ name: "General", price: "1.00", description: "" }],
+        completionRate: 0,
+        jobsCompleted: 0,
+        revenue: "0",
       });
     }
   }
@@ -214,6 +220,9 @@ export default function OfferingsPage() {
         avatar: stored?.avatar || "",
         serviceCount: 0,
         services: [],
+        completionRate: 0,
+        jobsCompleted: 0,
+        revenue: "0",
       });
     }
     const a = agentMap.get(id)!;
@@ -397,82 +406,71 @@ export default function OfferingsPage() {
                 <p className="text-[#A1A1A1]/40">No agents found</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="rounded-xl border border-white/[0.08] overflow-hidden">
+                {/* Table Header */}
+                <div className="grid grid-cols-12 gap-2 px-5 py-3 border-b border-white/[0.06] text-[#A1A1A1]/50 text-xs font-medium">
+                  <div className="col-span-4">Agent</div>
+                  <div className="col-span-2 text-center hidden sm:block">Offerings</div>
+                  <div className="col-span-2 text-center hidden sm:block">Success Rate</div>
+                  <div className="col-span-2 text-center hidden sm:block">Jobs</div>
+                  <div className="col-span-2 text-right">Price</div>
+                </div>
+
+                {/* Agent Rows */}
                 {filteredAgents.map((agent) => {
-                  const gradient = getGradient(agent.agentId);
-                  const icon = agent.avatar || "🤖";
+                  const icon = agent.avatar || "";
                   const minPrice = agent.services.length > 0
                     ? Math.min(...agent.services.map((s) => parseFloat(s.price)))
                     : 0;
 
                   return (
-                    <React.Fragment key={agent.agentId}>
-                    <Link href={`/agents/${agent.agentId}`}
-                      className="p-5 rounded-xl glass-card hover:border-[#F4C430]/50 transition group block">
-                      <div className="flex items-start gap-4 mb-4">
-                        <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${gradient} flex items-center justify-center shrink-0 shadow-lg overflow-hidden`}>
+                    <Link
+                      key={agent.agentId}
+                      href={`/agents/${agent.agentId}`}
+                      className="grid grid-cols-12 gap-2 px-5 py-4 border-b border-white/[0.04] hover:bg-white/[0.02] transition items-center group"
+                    >
+                      {/* Agent info */}
+                      <div className="col-span-4 flex items-center gap-3 min-w-0">
+                        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#F4C430]/20 to-[#FF9F1C]/10 flex items-center justify-center shrink-0 overflow-hidden">
                           {icon.startsWith("http") ? (
                             <img src={icon} alt="" className="w-full h-full object-cover" />
                           ) : (
-                            <span className="text-xl">{icon || "🤖"}</span>
+                            <span className="text-sm font-bold text-[#F4C430]">{agent.name.charAt(0).toUpperCase()}</span>
                           )}
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            <h3 className="font-semibold text-[#F5F5F5] text-sm group-hover:text-[#F4C430] transition">{agent.name}</h3>
-                            <span className="px-2 py-0.5 rounded-full bg-green-400/10 text-green-400 text-[10px] font-medium">Active</span>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[#F5F5F5] text-sm font-semibold truncate group-hover:text-[#F4C430] transition">{agent.name}</span>
+                            <span className="px-1.5 py-0.5 rounded-full bg-green-400/10 text-green-400 text-[9px] font-medium shrink-0">Active</span>
                           </div>
-                          <p className="text-[#A1A1A1]/40 text-[11px] font-mono truncate">
-                            {agent.provider.slice(0, 6)}...{agent.provider.slice(-4)}
-                          </p>
+                          <p className="text-[#A1A1A1]/30 text-[10px] font-mono truncate">{agent.provider.slice(0, 6)}...{agent.provider.slice(-4)}</p>
                         </div>
                       </div>
 
-                      {/* Agent description */}
-                      {agent.description && (
-                        <p className="text-[#A1A1A1]/50 text-xs leading-relaxed mb-4 line-clamp-2">{agent.description}</p>
-                      )}
-
-                      {/* Services list */}
-                      <div className="mb-4">
-                        <p className="text-[#A1A1A1]/30 text-[10px] uppercase tracking-wider mb-2">
-                          {agent.serviceCount} service{agent.serviceCount !== 1 && "s"}
-                        </p>
-                        <div className="space-y-1.5">
-                          {agent.services.slice(0, 3).map((svc, i) => (
-                            <div key={i} className="flex items-center justify-between py-1.5 px-2.5 rounded-lg bg-white/[0.02]">
-                              <div className="flex items-center gap-2 min-w-0">
-                                <span className="text-sm">{getServiceIcon(svc.name)}</span>
-                                <span className="text-[#A1A1A1]/70 text-xs truncate">{svc.name}</span>
-                              </div>
-                              <span className="text-[#F4C430] text-xs font-medium shrink-0 ml-2">{svc.price}</span>
-                            </div>
-                          ))}
-                          {agent.services.length > 3 && (
-                            <p className="text-[#A1A1A1]/30 text-[10px] text-center">+{agent.services.length - 3} more</p>
-                          )}
-                        </div>
+                      {/* Offerings count */}
+                      <div className="col-span-2 text-center hidden sm:block">
+                        <span className="text-[#F5F5F5] text-sm">{agent.serviceCount}</span>
                       </div>
 
-                      {/* Footer */}
-                      <div className="flex items-center justify-between pt-3 border-t border-white/[0.06]">
-                        <span className="text-[#A1A1A1]/40 text-xs">
-                          from <span className="text-[#F4C430] font-semibold">{minPrice.toFixed(2)}</span> per task
+                      {/* Success Rate */}
+                      <div className="col-span-2 text-center hidden sm:block">
+                        <span className={`text-sm font-medium ${agent.completionRate >= 80 ? "text-green-400" : agent.completionRate >= 50 ? "text-[#F4C430]" : "text-[#A1A1A1]/50"}`}>
+                          {agent.completionRate > 0 ? `${agent.completionRate.toFixed(1)}%` : "—"}
                         </span>
-                        <div className="flex gap-2">
-                          <span className="text-[#A1A1A1]/30 text-[10px] group-hover:text-[#F4C430] transition">
-                            View →
-                          </span>
-                        </div>
+                      </div>
+
+                      {/* Jobs */}
+                      <div className="col-span-2 text-center hidden sm:block">
+                        <span className="text-[#F5F5F5] text-sm">{agent.jobsCompleted.toLocaleString()}</span>
+                      </div>
+
+                      {/* Price */}
+                      <div className="col-span-2 text-right sm:col-span-2 col-span-8">
+                        <span className="text-[#F4C430] text-sm font-semibold">{minPrice > 0 ? `${minPrice.toFixed(2)}` : "—"}</span>
+                        <span className="text-[#A1A1A1]/30 text-xs ml-1">USDC</span>
                       </div>
                     </Link>
-                    <Link
-                      href={`/chat?hire=${agent.agentId}&name=${encodeURIComponent(agent.name)}`}
-                      className="mt-2 block w-full py-2 rounded-lg bg-[#F4C430]/10 border border-[#F4C430]/20 text-[#F4C430] text-xs text-center font-medium hover:bg-[#F4C430]/20 transition"
-                    >
-                      Hire via Butler
-                    </Link>
-                  </React.Fragment>);
+                  );
                 })}
               </div>
             )}
