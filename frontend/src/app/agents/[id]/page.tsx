@@ -101,13 +101,21 @@ export default function AgentDetailPage() {
       if (found) { setLocalAgent(found); setLoading(false); return; }
 
       try {
-        const [servicesRes, lbRes] = await Promise.all([
-          fetch(`${API_URL}/v1/services`),
-          fetch(`${API_URL}/v1/leaderboard`),
-        ]);
-        const services = await servicesRes.json();
-        const leaderboard = await lbRes.json();
         const agentId = Number(id);
+
+        // Fire ALL requests in parallel
+        const [servicesRes, lbRes, dealsRes, repRes, metaRes, sbRegistered, sbHosted] = await Promise.all([
+          fetch(`${API_URL}/v1/services`).then(r => r.ok ? r.json() : []).catch(() => []),
+          fetch(`${API_URL}/v1/leaderboard`).then(r => r.ok ? r.json() : []).catch(() => []),
+          fetch(`${API_URL}/v1/deals/agent/${agentId}`).then(r => r.ok ? r.json() : []).catch(() => []),
+          fetch(`${API_URL}/v1/reputation/${agentId}`).then(r => r.ok ? r.json() : null).catch(() => null),
+          fetch(`${API_URL}/api/agent/${agentId}/metadata`).then(r => r.ok ? r.json() : null).catch(() => null),
+          Promise.resolve(supabase.from("registered_agents").select("name, description, avatar, agent_wallet").eq("agent_nft_id", agentId)).then(r => r.data?.[0] || null).catch(() => null),
+          Promise.resolve(supabase.from("hosted_agents").select("name, description, agent_wallet").eq("agent_nft_id", agentId)).then(r => r.data?.[0] || null).catch(() => null),
+        ]);
+
+        const services = servicesRes;
+        const leaderboard = lbRes;
         const agentServices = services.filter((s: any) => s.agentId === agentId);
 
         if (agentServices.length > 0) {
@@ -125,60 +133,21 @@ export default function AgentDetailPage() {
           });
         }
 
-        // Try to fetch deals
-        try {
-          const dealsRes = await fetch(`${API_URL}/v1/deals/agent/${agentId}`);
-          if (dealsRes.ok) setDeals(await dealsRes.json());
-        } catch {}
+        if (dealsRes.length > 0) setDeals(dealsRes);
+        if (repRes) setReputation(repRes);
+        if (metaRes) setMetadata(metaRes);
 
-        // Fetch reputation
-        try {
-          const repRes = await fetch(`${API_URL}/v1/reputation/${agentId}`);
-          if (repRes.ok) setReputation(await repRes.json());
-        } catch {}
+        // Set stored agent from Supabase
+        const sbAgent = sbRegistered || (sbHosted ? { ...sbHosted, avatar: null } : null);
+        if (sbAgent) setStoredAgent(sbAgent);
+        const sbAgentName = sbAgent?.name || "";
 
-        // Fetch rich metadata (OASF, ERC-8004)
-        try {
-          const metaRes = await fetch(`${API_URL}/api/agent/${agentId}/metadata`);
-          if (metaRes.ok) setMetadata(await metaRes.json());
-        } catch {}
-
-
-
-        // Fetch stored agent metadata from Supabase
-        let foundStored = false;
-        let sbAgentName = "";
-        try {
-          const { data, error } = await supabase
-            .from("registered_agents")
-            .select("name, description, avatar, agent_wallet")
-            .eq("agent_nft_id", agentId);
-          if (!error && data && data.length > 0) {
-            setStoredAgent(data[0]);
-            foundStored = true;
-            sbAgentName = data[0].name || "";
-          }
-        } catch {}
-        if (!foundStored) {
-          try {
-            const { data, error } = await supabase
-              .from("hosted_agents")
-              .select("name, description, agent_wallet")
-              .eq("agent_nft_id", agentId);
-            if (!error && data && data.length > 0) {
-              setStoredAgent({ ...data[0], avatar: null, agent_wallet: data[0].agent_wallet || null });
-            }
-          } catch {}
-        }
-        // Resolve Agentscan UUID (via our proxy — Agentscan has no CORS)
-        try {
-          const resolvedName = sbAgentName || agentServices[0]?.name || `Agent ${agentId}`;
-          const asRes = await fetch(`/api/agentscan?name=${encodeURIComponent(resolvedName)}&tokenId=${agentId}`);
-          if (asRes.ok) {
-            const asData = await asRes.json();
-            if (asData.url) setAgentscanUrl(asData.url);
-          }
-        } catch {}
+        // Resolve Agentscan UUID (non-blocking — don't hold up page render)
+        const resolvedName = sbAgentName || agentServices[0]?.name || `Agent ${agentId}`;
+        fetch(`/api/agentscan?name=${encodeURIComponent(resolvedName)}&tokenId=${agentId}`)
+          .then(r => r.ok ? r.json() : null)
+          .then(d => { if (d?.url) setAgentscanUrl(d.url); })
+          .catch(() => {});
 
       } catch (err) {
         console.error("Failed to fetch agent:", err);
