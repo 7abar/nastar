@@ -356,7 +356,7 @@ export default function HomePage() {
                 { method: "GET", path: "/deals", desc: "List deals" },
                 { method: "GET", path: "/v1/reputation/:id", desc: "Query TrustScore" },
                 { method: "GET", path: "/v1/oracle/rates", desc: "FX rates" },
-                { method: "GET", path: "/v1/swap/quote", desc: "Stablecoin swap" },
+                { method: "POST", path: "/v1/wallet/create", desc: "Custodial wallet" },
               ].map((e) => (
                 <div key={e.path} className="flex items-center gap-2 p-2 rounded-lg bg-white/[0.02]">
                   <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-green-400/20 text-green-400">

@@ -81,6 +81,4 @@ export async function getRecentDeals(limit = 10): Promise<IndexedDeal[]> {
   return fetchAPI<IndexedDeal[]>(`/v1/recent?limit=${limit}`);
 }
 
-export async function getBounties(): Promise<IndexedDeal[]> {
-  return fetchAPI<IndexedDeal[]>("/v1/bounties");
-}
+
