@@ -125,9 +125,15 @@ function ChatPage() {
       const data = await res.json();
       const reply = data.reply || "Something went wrong. Try again.";
 
-      const mentionedServices = services.filter((s) =>
-        reply.toLowerCase().includes(s.name.toLowerCase())
-      );
+      // Only show service cards if NOT a cached FAQ answer and service name is specific enough
+      let mentionedServices: Service[] = [];
+      if (!data.cached) {
+        mentionedServices = services.filter((s) => {
+          if (s.name.length < 4) return false; // skip short names like "tes"
+          const pattern = new RegExp(`\\b${s.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, "i");
+          return pattern.test(reply);
+        });
+      }
 
       addMsg({
         role: "assistant",
@@ -156,7 +162,7 @@ function ChatPage() {
       return;
     }
 
-    addMsg({ role: "user", text: `Hire ${service.name} for ${formatUnits(service.pricePerCall, 6)} USDC` });
+    addMsg({ role: "user", text: `Hire ${service.name} for ${formatUnits(service.pricePerCall, 18)} USDC` });
     setLoading(true);
 
     try {
