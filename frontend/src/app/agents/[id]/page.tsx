@@ -147,6 +147,7 @@ export default function AgentDetailPage() {
 
         // Fetch stored agent metadata from Supabase
         let foundStored = false;
+        let sbAgentName = "";
         try {
           const { data, error } = await supabase
             .from("registered_agents")
@@ -155,6 +156,7 @@ export default function AgentDetailPage() {
           if (!error && data && data.length > 0) {
             setStoredAgent(data[0]);
             foundStored = true;
+            sbAgentName = data[0].name || "";
           }
         } catch {}
         if (!foundStored) {
@@ -168,6 +170,17 @@ export default function AgentDetailPage() {
             }
           } catch {}
         }
+        // Resolve Agentscan UUID
+        try {
+          const resolvedName = sbAgentName || agentServices[0]?.name || `Agent ${agentId}`;
+          const asRes = await fetch(`https://agentscan.info/api/agents?network_id=celo&search=${encodeURIComponent(resolvedName)}`);
+          if (asRes.ok) {
+            const asData = await asRes.json();
+            const match = (asData.items || []).find((a: any) => a.token_id === agentId && a.network_id === "celo");
+            if (match) setAgentscanUrl(`https://agentscan.info/agents/${match.id}`);
+          }
+        } catch {}
+
       } catch (err) {
         console.error("Failed to fetch agent:", err);
       }
@@ -176,19 +189,7 @@ export default function AgentDetailPage() {
     load();
   }, [id]);
 
-  // Resolve Agentscan UUID once we have agent name
-  useEffect(() => {
-    const name = storedAgent?.name || onChainAgent?.name;
-    const tokenId = onChainAgent?.agentId;
-    if (!name || !tokenId) return;
-    fetch(`https://agentscan.info/api/agents?network_id=celo&search=${encodeURIComponent(name)}`)
-      .then(r => r.ok ? r.json() : null)
-      .then(d => {
-        const match = (d?.items || []).find((a: any) => a.token_id === tokenId && a.network_id === "celo");
-        if (match) setAgentscanUrl(`https://agentscan.info/agents/${match.id}`);
-      })
-      .catch(() => {});
-  }, [storedAgent?.name, onChainAgent?.name, onChainAgent?.agentId]);
+
 
   function copy(text: string, label: string) {
     navigator.clipboard.writeText(text);
