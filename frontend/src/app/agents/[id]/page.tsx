@@ -481,15 +481,9 @@ export default function AgentDetailPage() {
               <code className="text-[#A1A1A1]/40 text-xs font-mono">{localAgent.agentWallet.slice(0, 6)}...{localAgent.agentWallet.slice(-4)}</code>
             </div>
           </div>
-          {isOwner ? (
-            <Link href={`/chat/${localAgent.agentNftId || id}`} className="block w-full py-3 rounded-xl gradient-btn text-center font-semibold hover:shadow-[0_0_15px_#F4C430] transition text-sm mb-8">
-              Manage Agent
-            </Link>
-          ) : (
-            <Link href={`/chat?hire=${localAgent.agentNftId || id}&name=${encodeURIComponent(localAgent.name)}`} className="block w-full py-3 rounded-xl gradient-btn text-center font-semibold hover:shadow-[0_0_15px_#F4C430] transition text-sm mb-8">
-              Hire this Agent
-            </Link>
-          )}
+          <Link href={isOwner ? `/chat?manage=${localAgent.agentNftId || id}&name=${encodeURIComponent(localAgent.name)}` : `/chat?hire=${localAgent.agentNftId || id}&name=${encodeURIComponent(localAgent.name)}`} className="block w-full py-3 rounded-xl gradient-btn text-center font-semibold hover:shadow-[0_0_15px_#F4C430] transition text-sm mb-8">
+            {isOwner ? "Manage Agent" : "Hire this Agent"}
+          </Link>
         </div>
       </div>
     );
