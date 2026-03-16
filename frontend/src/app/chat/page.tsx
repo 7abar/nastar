@@ -271,8 +271,8 @@ function ChatPage() {
             <div key={msg.id} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"} animate-in`}>
               {/* Avatar for assistant */}
               {msg.role === "assistant" && (
-                <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#F4C430] to-[#FF9F1C] flex items-center justify-center mr-2 mt-1 shrink-0">
-                  <span className="text-[#0A0A0A] font-bold text-xs">N</span>
+                <div className="w-7 h-7 rounded-lg overflow-hidden mr-2 mt-1 shrink-0">
+                  <img src="/nastar-mascot.png" alt="Nastar" className="w-full h-full object-cover" />
                 </div>
               )}
 
@@ -321,8 +321,8 @@ function ChatPage() {
 
           {loading && (
             <div className="flex items-start">
-              <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#F4C430] to-[#FF9F1C] flex items-center justify-center mr-2 mt-1 shrink-0">
-                <span className="text-[#0A0A0A] font-bold text-xs">N</span>
+              <div className="w-7 h-7 rounded-lg overflow-hidden mr-2 mt-1 shrink-0">
+                <img src="/nastar-mascot.png" alt="Nastar" className="w-full h-full object-cover" />
               </div>
               <div className="bg-white/[0.06] border border-white/[0.08] rounded-2xl rounded-bl-md px-4 py-3">
                 <div className="flex gap-1">

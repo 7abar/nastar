@@ -178,6 +178,15 @@ export default function AgentChatPage() {
         <div className="max-w-2xl mx-auto space-y-4">
           {messages.map((msg, i) => (
             <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+              {msg.role === "assistant" && (
+                <div className="w-7 h-7 rounded-lg overflow-hidden mr-2 mt-1 shrink-0">
+                  {agentAvatar ? (
+                    <img src={agentAvatar} alt={agentName} className="w-full h-full object-cover" />
+                  ) : (
+                    <img src="/nastar-mascot.png" alt="Nastar" className="w-full h-full object-cover" />
+                  )}
+                </div>
+              )}
               <div className={`max-w-[80%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${
                 msg.role === "user"
                   ? "bg-[#F4C430] text-[#0A0A0A] rounded-br-md"
