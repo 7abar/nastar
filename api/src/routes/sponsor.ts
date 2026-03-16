@@ -261,4 +261,82 @@ router.get("/balance", async (_req: Request, res: Response) => {
   }
 });
 
+/**
+ * POST /v1/sponsor/mint-identity
+ * Mint an ERC-8004 identity for a buyer address.
+ * Gas sponsored by server wallet.
+ * Note: register() mints to msg.sender (server), then transfers to buyer.
+ */
+router.post("/mint-identity", async (req: Request, res: Response) => {
+  try {
+    const pk = process.env.PRIVATE_KEY;
+    if (!pk) return res.status(500).json({ error: "Sponsor wallet not configured" });
+
+    const { ownerAddress } = req.body;
+    if (!ownerAddress) return res.status(400).json({ error: "ownerAddress required" });
+
+    // Check if already has identity
+    const balance = await publicClient.readContract({
+      address: CONTRACTS.IDENTITY_REGISTRY as `0x${string}`,
+      abi: IDENTITY_ABI,
+      functionName: "balanceOf",
+      args: [ownerAddress as `0x${string}`],
+    });
+
+    if (balance > 0n) {
+      // Find existing token ID
+      for (let i = 0n; i <= 2000n; i++) {
+        try {
+          const owner = await publicClient.readContract({
+            address: CONTRACTS.IDENTITY_REGISTRY as `0x${string}`,
+            abi: IDENTITY_ABI,
+            functionName: "ownerOf",
+            args: [i],
+          });
+          if ((owner as string).toLowerCase() === ownerAddress.toLowerCase()) {
+            return res.json({ success: true, agentNftId: Number(i), alreadyExists: true });
+          }
+        } catch { continue; }
+      }
+    }
+
+    const account = privateKeyToAccount(pk as `0x${string}`);
+    const walletClient = createWalletClient({ account, chain: celo, transport: http(CELO_RPC) });
+
+    // Mint — goes to server wallet
+    const mintHash = await walletClient.writeContract({
+      address: CONTRACTS.IDENTITY_REGISTRY as `0x${string}`,
+      abi: IDENTITY_ABI,
+      functionName: "register",
+    });
+    const receipt = await publicClient.waitForTransactionReceipt({ hash: mintHash });
+
+    // Extract tokenId from Transfer event
+    const transferLog = receipt.logs.find(
+      (l) => l.topics[0] === "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+    );
+    let agentNftId = 0;
+    if (transferLog?.topics[3]) {
+      agentNftId = Number(BigInt(transferLog.topics[3]));
+    }
+
+    // Transfer NFT to buyer
+    const TRANSFER_ABI = parseAbi([
+      "function transferFrom(address from, address to, uint256 tokenId)",
+    ]);
+    const txHash = await walletClient.writeContract({
+      address: CONTRACTS.IDENTITY_REGISTRY as `0x${string}`,
+      abi: TRANSFER_ABI,
+      functionName: "transferFrom",
+      args: [account.address, ownerAddress as `0x${string}`, BigInt(agentNftId)],
+    });
+    await publicClient.waitForTransactionReceipt({ hash: txHash });
+
+    return res.json({ success: true, agentNftId, txHash });
+  } catch (err: any) {
+    console.error("[sponsor] mint-identity error:", err.message);
+    return res.status(500).json({ error: err.message?.slice(0, 200) || "Mint failed" });
+  }
+});
+
 export default router;

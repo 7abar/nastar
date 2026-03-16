@@ -169,45 +169,67 @@ function ChatPage() {
       const wallet = wallets[0];
       const provider = await wallet.getEthereumProvider();
       const address = wallet.address as `0x${string}`;
-
-      addMsg({ role: "system", text: "Checking identity..." });
-      const balance = await client.readContract({
-        address: CONTRACTS.IDENTITY_REGISTRY, abi: ERC8004_ABI, functionName: "balanceOf", args: [address],
-      });
-
-      if (balance === 0n) {
-        addMsg({ role: "system", text: "Minting agent identity NFT..." });
-        const mintHash = await provider.request({ method: "eth_sendTransaction", params: [{ from: address, to: CONTRACTS.IDENTITY_REGISTRY, data: "0x1aa3a008" }] });
-        await client.waitForTransactionReceipt({ hash: mintHash as `0x${string}` });
-      }
-
-      let buyerAgentId = 0n;
-      for (let i = 0n; i <= 100n; i++) {
-        try {
-          const owner = await client.readContract({
-            address: CONTRACTS.IDENTITY_REGISTRY,
-            abi: [{ type: "function", name: "ownerOf", inputs: [{ name: "tokenId", type: "uint256" }], outputs: [{ type: "address" }], stateMutability: "view" }] as const,
-            functionName: "ownerOf", args: [i],
-          });
-          if (owner.toLowerCase() === address.toLowerCase()) { buyerAgentId = i; break; }
-        } catch {}
-      }
-
       const amount = service.pricePerCall;
       const paymentToken = service.paymentToken as `0x${string}`;
 
-      addMsg({ role: "system", text: "Approving payment..." });
-      const approveData = encodeFunctionData({ abi: ERC20_ABI, functionName: "approve", args: [CONTRACTS.NASTAR_ESCROW, amount] });
-      const appHash = await provider.request({ method: "eth_sendTransaction", params: [{ from: address, to: paymentToken, data: approveData }] });
-      await client.waitForTransactionReceipt({ hash: appHash as `0x${string}` });
+      // Step 1: Identity — sponsor mints if buyer doesn't have one
+      addMsg({ role: "system", text: "Preparing..." });
+      let buyerAgentId = 0n;
+      const balance = await client.readContract({
+        address: CONTRACTS.IDENTITY_REGISTRY as `0x${string}`, abi: ERC8004_ABI, functionName: "balanceOf", args: [address],
+      });
 
+      if (balance === 0n) {
+        // Use sponsor API to mint identity (gas-free for user)
+        const mintRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "https://api-production-a473.up.railway.app"}/v1/sponsor/mint-identity`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ownerAddress: address }),
+        });
+        if (mintRes.ok) {
+          const mintData = await mintRes.json();
+          buyerAgentId = BigInt(mintData.agentNftId || 0);
+        }
+      } else {
+        // Find existing token ID
+        for (let i = 0n; i <= 2000n; i++) {
+          try {
+            const owner = await client.readContract({
+              address: CONTRACTS.IDENTITY_REGISTRY as `0x${string}`,
+              abi: [{ type: "function", name: "ownerOf", inputs: [{ name: "tokenId", type: "uint256" }], outputs: [{ type: "address" }], stateMutability: "view" }] as const,
+              functionName: "ownerOf", args: [i],
+            });
+            if ((owner as string).toLowerCase() === address.toLowerCase()) { buyerAgentId = i; break; }
+          } catch { continue; }
+        }
+      }
+
+      // Step 2: Check allowance — max-approve once, never again
+      let needsApprove = true;
+      try {
+        const allowance = await client.readContract({
+          address: paymentToken, abi: ERC20_ABI, functionName: "allowance",
+          args: [address, CONTRACTS.NASTAR_ESCROW as `0x${string}`],
+        });
+        if (BigInt(allowance as any) >= BigInt(amount)) needsApprove = false;
+      } catch {}
+
+      if (needsApprove) {
+        addMsg({ role: "system", text: "One-time token approval (future hires skip this)..." });
+        const maxUint = BigInt("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+        const approveData = encodeFunctionData({ abi: ERC20_ABI, functionName: "approve", args: [CONTRACTS.NASTAR_ESCROW as `0x${string}`, maxUint] });
+        const appHash = await provider.request({ method: "eth_sendTransaction", params: [{ from: address, to: paymentToken, data: approveData }] });
+        await client.waitForTransactionReceipt({ hash: appHash as `0x${string}` });
+      }
+
+      // Step 3: Create deal — single transaction
       addMsg({ role: "system", text: "Creating deal + escrowing payment..." });
       const deadline = BigInt(Math.floor(Date.now() / 1000) + 86400);
       const dealData = encodeFunctionData({
         abi: ESCROW_ABI, functionName: "createDeal",
-        args: [BigInt(serviceIndex), buyerAgentId, service.agentId, paymentToken, amount, `Hired via Nastar: ${service.name}`, deadline, true],
+        args: [BigInt(serviceIndex), buyerAgentId, BigInt(service.agentId), paymentToken, BigInt(amount), `Hired via Nastar: ${service.name}`, deadline, true],
       });
-      const dealHash = await provider.request({ method: "eth_sendTransaction", params: [{ from: address, to: CONTRACTS.NASTAR_ESCROW, data: dealData }] });
+      const dealHash = await provider.request({ method: "eth_sendTransaction", params: [{ from: address, to: CONTRACTS.NASTAR_ESCROW as `0x${string}`, data: dealData }] });
       await client.waitForTransactionReceipt({ hash: dealHash as `0x${string}` });
 
       addMsg({
