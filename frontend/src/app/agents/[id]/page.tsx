@@ -263,7 +263,7 @@ export default function AgentDetailPage() {
 
               {/* Right buttons */}
               <div className="flex flex-col gap-2 shrink-0">
-                <a href={`/chat?hire=${id}&name=${encodeURIComponent(agentName)}`}
+                <a href={`/chat?hire=${id}&name=${encodeURIComponent(storedAgent?.name || onChainAgent.name)}`}
                   className="px-6 py-2 rounded-full bg-[#F4C430] text-[#0A0A0A] text-sm font-bold hover:shadow-[0_0_15px_rgba(244,196,48,0.3)] transition text-center">
                   Hire
                 </a>
