@@ -61,6 +61,9 @@ function ChatPage() {
   const [prefilled, setPrefilled] = useState(false);
   const [nastarWallet, setNastarWallet] = useState<string | null>(null);
   const [walletBalances, setWalletBalances] = useState<Record<string, string>>({});
+  const [showWalletPanel, setShowWalletPanel] = useState(false);
+  const [depositMode, setDepositMode] = useState(false);
+  const [copied, setCopied] = useState(false);
   const messagesEnd = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const searchParams = useSearchParams();
@@ -337,7 +340,10 @@ function ChatPage() {
                 Ask about how Nastar works, explore features, or get help hiring AI agents with on-chain escrow.
               </p>
               {nastarWallet && (
-                <div className="mb-6 w-full max-w-lg p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+                <button
+                  onClick={() => setShowWalletPanel(true)}
+                  className="mb-6 w-full max-w-lg p-3 rounded-xl bg-white/[0.03] border border-white/[0.06] hover:border-[#F4C430]/30 transition text-left"
+                >
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-[#A1A1A1] text-xs">Your Nastar Wallet</span>
                     <span className="text-[#F4C430] text-xs font-mono">{nastarWallet.slice(0, 6)}...{nastarWallet.slice(-4)}</span>
@@ -349,10 +355,10 @@ function ChatPage() {
                       </span>
                     ))}
                     {Object.keys(walletBalances).filter(k => k !== "CELO").length === 0 && (
-                      <span className="text-[#A1A1A1]/40">No stablecoins yet — deposit to hire agents</span>
+                      <span className="text-[#A1A1A1]/40">Tap to deposit &amp; manage wallet</span>
                     )}
                   </div>
-                </div>
+                </button>
               )}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full max-w-lg">
                 {suggestions.map((s) => (
@@ -446,6 +452,17 @@ function ChatPage() {
       {/* Input bar */}
       <div className="border-t border-white/[0.06] bg-[#0A0A0A] px-4 py-3">
         <div className="max-w-2xl mx-auto flex gap-2">
+          {nastarWallet && (
+            <button
+              onClick={() => setShowWalletPanel(true)}
+              className="px-3 py-3 rounded-xl bg-white/[0.06] border border-white/[0.08] text-[#F4C430] hover:border-[#F4C430]/40 transition"
+              title="Wallet"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a2.25 2.25 0 00-2.25-2.25H15a3 3 0 11-6 0H5.25A2.25 2.25 0 003 12m18 0v6a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 18v-6m18 0V9M3 12V9m18 0a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 013 9m18 0V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 013 6v3" />
+              </svg>
+            </button>
+          )}
           <input
             ref={inputRef}
             value={input}
@@ -464,6 +481,109 @@ function ChatPage() {
           </button>
         </div>
       </div>
+
+      {/* Wallet Panel Overlay */}
+      {showWalletPanel && nastarWallet && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+          <div className="absolute inset-0 bg-black/60" onClick={() => { setShowWalletPanel(false); setDepositMode(false); }} />
+          <div className="relative w-full max-w-sm mx-4 mb-4 sm:mb-0 rounded-2xl bg-[#111] border border-white/[0.1] shadow-2xl overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.06]">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full overflow-hidden">
+                  <img src="/nastar-mascot.png" alt="Nastar" className="w-full h-full object-cover" />
+                </div>
+                <div>
+                  <p className="text-[#F5F5F5] text-sm font-semibold">Nastar Wallet</p>
+                  <p className="text-[#A1A1A1]/60 text-xs font-mono flex items-center gap-1">
+                    {nastarWallet.slice(0, 6)}...{nastarWallet.slice(-4)}
+                    <button
+                      onClick={() => { navigator.clipboard.writeText(nastarWallet); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
+                      className="text-[#A1A1A1]/40 hover:text-[#F4C430] transition"
+                    >
+                      {copied ? "✓" : "⎘"}
+                    </button>
+                  </p>
+                </div>
+              </div>
+              <button onClick={() => { setShowWalletPanel(false); setDepositMode(false); }} className="text-[#A1A1A1]/40 hover:text-white transition text-lg">✕</button>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex gap-3 px-5 py-4">
+              <button
+                onClick={() => setDepositMode(true)}
+                className="flex-1 flex flex-col items-center gap-1.5 py-3 rounded-xl bg-[#F4C430]/10 border border-[#F4C430]/20 text-[#F4C430] hover:bg-[#F4C430]/20 transition"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 13.5L12 21m0 0l-7.5-7.5M12 21V3" />
+                </svg>
+                <span className="text-xs font-medium">Deposit</span>
+              </button>
+              <button
+                onClick={() => addMsg({ role: "assistant", text: `To withdraw, send stablecoins from your Nastar Wallet to any address on Celo.\n\nYour wallet: \`${nastarWallet}\`\n\nWithdrawal is coming soon via the butler. For now, contact support.` })}
+                className="flex-1 flex flex-col items-center gap-1.5 py-3 rounded-xl bg-white/[0.04] border border-white/[0.08] text-[#A1A1A1] hover:text-white hover:border-white/[0.15] transition"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 10.5L12 3m0 0l7.5 7.5M12 3v18" />
+                </svg>
+                <span className="text-xs font-medium">Withdraw</span>
+              </button>
+            </div>
+
+            {/* Deposit Mode */}
+            {depositMode && (
+              <div className="px-5 pb-4">
+                <div className="p-4 rounded-xl bg-[#F4C430]/5 border border-[#F4C430]/20">
+                  <p className="text-[#F4C430] text-xs font-medium mb-2">Send stablecoins on Celo to:</p>
+                  <div className="flex items-center gap-2">
+                    <code className="flex-1 text-[#F5F5F5] text-xs font-mono break-all">{nastarWallet}</code>
+                    <button
+                      onClick={() => { navigator.clipboard.writeText(nastarWallet); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
+                      className="px-2 py-1 rounded-lg bg-[#F4C430]/20 text-[#F4C430] text-xs hover:bg-[#F4C430]/30 transition"
+                    >
+                      {copied ? "Copied!" : "Copy"}
+                    </button>
+                  </div>
+                  <p className="text-[#A1A1A1]/40 text-[10px] mt-2">Supported: cUSD, USDC, USDT on Celo (Chain ID: 42220)</p>
+                </div>
+              </div>
+            )}
+
+            {/* Assets */}
+            <div className="px-5 pb-2">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-[#A1A1A1]/60 text-xs font-medium">Assets</p>
+                <span className="text-[#A1A1A1]/30 text-[10px]">Celo Network</span>
+              </div>
+            </div>
+            <div className="px-5 pb-5 space-y-1">
+              {[
+                { symbol: "cUSD", name: "Celo Dollar", icon: "🟡" },
+                { symbol: "USDC", name: "USD Coin", icon: "🔵" },
+                { symbol: "USDT", name: "Tether", icon: "🟢" },
+                { symbol: "CELO", name: "CELO", icon: "🟠" },
+              ].map((token) => {
+                const bal = parseFloat(walletBalances[token.symbol] || "0");
+                return (
+                  <div key={token.symbol} className="flex items-center justify-between py-2.5 px-3 rounded-lg hover:bg-white/[0.02] transition">
+                    <div className="flex items-center gap-3">
+                      <span className="text-lg">{token.icon}</span>
+                      <div>
+                        <p className="text-[#F5F5F5] text-sm font-medium">{token.name}</p>
+                        <p className="text-[#A1A1A1]/40 text-xs">{token.symbol}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[#F5F5F5] text-sm font-medium">{token.symbol === "CELO" ? bal.toFixed(4) : bal.toFixed(2)} {token.symbol}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

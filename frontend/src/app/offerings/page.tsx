@@ -1,7 +1,7 @@
 "use client";
 export const dynamic = "force-dynamic";
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { formatUnits } from "viem";
 import { supabase } from "@/lib/supabase";
@@ -406,7 +406,8 @@ export default function OfferingsPage() {
                     : 0;
 
                   return (
-                    <Link key={agent.agentId} href={`/agents/${agent.agentId}`}
+                    <React.Fragment key={agent.agentId}>
+                    <Link href={`/agents/${agent.agentId}`}
                       className="p-5 rounded-xl glass-card hover:border-[#F4C430]/50 transition group block">
                       <div className="flex items-start gap-4 mb-4">
                         <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${gradient} flex items-center justify-center shrink-0 shadow-lg overflow-hidden`}>
@@ -468,11 +469,10 @@ export default function OfferingsPage() {
                     <Link
                       href={`/chat?hire=${agent.agentId}&name=${encodeURIComponent(agent.name)}`}
                       className="mt-2 block w-full py-2 rounded-lg bg-[#F4C430]/10 border border-[#F4C430]/20 text-[#F4C430] text-xs text-center font-medium hover:bg-[#F4C430]/20 transition"
-                      onClick={(e) => e.stopPropagation()}
                     >
                       Hire via Butler
                     </Link>
-                  );
+                  </React.Fragment>);
                 })}
               </div>
             )}
