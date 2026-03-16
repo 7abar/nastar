@@ -223,43 +223,29 @@ function ChatPage() {
     if (agentId && agentName) {
       setPrefilled(true);
 
-      // Find matching service for this agent
-      const matchedService = services.find((s) => String(s.agentId) === String(agentId));
-      const matchedIndex = matchedService ? services.indexOf(matchedService) : -1;
+      // Find ALL services for this specific agent ID — no name searching
+      const agentServices = services.filter((s) => String(s.agentId) === String(agentId));
 
-      const hireMsg = `I want to hire ${agentName}`;
-      addMsg({ role: "user", text: hireMsg });
+      if (agentServices.length > 0) {
+        // Build service list
+        const serviceList = agentServices.map((s) => {
+          const price = formatUnits(s.pricePerCall, 18);
+          return `- **${s.name}** — ${s.description || "Service"}\n  Price: **${price} USD**`;
+        }).join("\n");
 
-      if (matchedService) {
-        // Show service info + hire button directly
-        const price = formatUnits(matchedService.pricePerCall, 18);
         addMsg({
           role: "assistant",
-          text: `**${agentName}** — ${matchedService.description || "AI agent on Nastar"}\n\nFee: **${price} USDC** per call\nPayment: On-chain escrow (auto-releases on delivery)\nDispute window: 3 days\n\nReady to hire? Click below or type "yes" to proceed.`,
-          services: [matchedService],
-          serviceIndex: matchedIndex,
+          text: `**${agentName}** (Agent #${agentId})\n\n${agentServices.length > 1 ? "Available services:" : "Service:"}\n\n${serviceList}\n\nPayment is secured in on-chain escrow. Auto-releases on delivery. 3-day dispute window.\n\nClick below to hire:`,
+          services: agentServices,
+          serviceIndex: services.indexOf(agentServices[0]),
         });
       } else {
-        // No on-chain service found — ask butler
-        setLoading(true);
-        fetch("/api/chat", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            messages: [{ role: "user", content: hireMsg }],
-            services: services.map((s, i) => `#${i}: "${s.name}" (Agent ${s.agentId}) — ${s.description}. ${formatUnits(s.pricePerCall, 18)} USDC`).join("\n"),
-            wallet: wallets?.[0]?.address || "anonymous",
-          }),
-        })
-          .then((r) => r.json())
-          .then((data) => {
-            addMsg({ role: "assistant", text: data.reply || `I'll help you hire ${agentName}. Let me look up their services.` });
-            setLoading(false);
-          })
-          .catch(() => {
-            addMsg({ role: "assistant", text: `I'll help you hire ${agentName}. Connect your wallet to get started.` });
-            setLoading(false);
-          });
+        // Agent exists but no on-chain services yet
+        addMsg({
+          role: "assistant",
+          text: `**${agentName}** (Agent #${agentId}) doesn't have on-chain services registered yet.\n\nYou can still chat with them directly to discuss your needs.`,
+          agentLink: { id: agentId, name: agentName },
+        });
       }
     }
   }, [searchParams, prefilled, services]);
