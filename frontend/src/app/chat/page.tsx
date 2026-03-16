@@ -114,33 +114,49 @@ function ChatPage() {
     if (prefilled) return;
     const hireId = searchParams.get("hire");
     const hireName = searchParams.get("name");
-    // Legacy support
     const agentId = hireId || searchParams.get("agent");
     const agentName = hireName || searchParams.get("name");
     if (agentId && agentName) {
       setPrefilled(true);
-      // Auto-send hire message to butler
+
+      // Find matching service for this agent
+      const matchedService = services.find((s) => String(s.agentId) === String(agentId));
+      const matchedIndex = matchedService ? services.indexOf(matchedService) : -1;
+
       const hireMsg = `I want to hire ${agentName}`;
       addMsg({ role: "user", text: hireMsg });
-      setLoading(true);
-      fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          messages: [{ role: "user", content: hireMsg }],
-          services: services.map((s, i) => `#${i}: "${s.name}" (Agent ${s.agentId}) — ${s.description}`).join("\n"),
-          wallet: wallets?.[0]?.address || "anonymous",
-        }),
-      })
-        .then((r) => r.json())
-        .then((data) => {
-          addMsg({ role: "assistant", text: data.reply || "Let me help you hire this agent." });
-          setLoading(false);
-        })
-        .catch(() => {
-          addMsg({ role: "assistant", text: `I'll help you hire ${agentName}. Connect your wallet to get started, then I'll handle the escrow and payment.` });
-          setLoading(false);
+
+      if (matchedService) {
+        // Show service info + hire button directly
+        const price = formatUnits(matchedService.pricePerCall, 18);
+        addMsg({
+          role: "assistant",
+          text: `**${agentName}** — ${matchedService.description || "AI agent on Nastar"}\n\nFee: **${price} USDC** per call\nPayment: On-chain escrow (auto-releases on delivery)\nDispute window: 3 days\n\nReady to hire? Click below or type "yes" to proceed.`,
+          services: [matchedService],
+          serviceIndex: matchedIndex,
         });
+      } else {
+        // No on-chain service found — ask butler
+        setLoading(true);
+        fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            messages: [{ role: "user", content: hireMsg }],
+            services: services.map((s, i) => `#${i}: "${s.name}" (Agent ${s.agentId}) — ${s.description}. ${formatUnits(s.pricePerCall, 18)} USDC`).join("\n"),
+            wallet: wallets?.[0]?.address || "anonymous",
+          }),
+        })
+          .then((r) => r.json())
+          .then((data) => {
+            addMsg({ role: "assistant", text: data.reply || `I'll help you hire ${agentName}. Let me look up their services.` });
+            setLoading(false);
+          })
+          .catch(() => {
+            addMsg({ role: "assistant", text: `I'll help you hire ${agentName}. Connect your wallet to get started.` });
+            setLoading(false);
+          });
+      }
     }
   }, [searchParams, prefilled, services]);
 

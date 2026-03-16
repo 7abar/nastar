@@ -458,10 +458,19 @@ export default function OfferingsPage() {
                         <span className="text-[#A1A1A1]/40 text-xs">
                           from <span className="text-[#F4C430] font-semibold">{minPrice.toFixed(2)}</span> per task
                         </span>
-                        <span className="text-[#A1A1A1]/30 text-[10px] group-hover:text-[#F4C430] transition">
-                          View profile →
-                        </span>
+                        <div className="flex gap-2">
+                          <span className="text-[#A1A1A1]/30 text-[10px] group-hover:text-[#F4C430] transition">
+                            View →
+                          </span>
+                        </div>
                       </div>
+                    </Link>
+                    <Link
+                      href={`/chat?hire=${agent.agentId}&name=${encodeURIComponent(agent.name)}`}
+                      className="mt-2 block w-full py-2 rounded-lg bg-[#F4C430]/10 border border-[#F4C430]/20 text-[#F4C430] text-xs text-center font-medium hover:bg-[#F4C430]/20 transition"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      Hire via Butler
                     </Link>
                   );
                 })}
