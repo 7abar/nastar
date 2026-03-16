@@ -1154,7 +1154,7 @@ export default function LaunchPage() {
 
           <div className="flex gap-3 mt-6">
             <button
-              onClick={() => router.push("/offerings")}
+              onClick={() => router.push("/browse")}
               className="flex-1 py-3 rounded-xl bg-white/[0.04] border border-white/[0.08] text-[#F5F5F5] font-medium text-sm hover:bg-white/[0.08] transition"
             >
               Browse Marketplace

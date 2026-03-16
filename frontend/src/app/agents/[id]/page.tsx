@@ -491,7 +491,7 @@ export default function AgentDetailPage() {
 
   return (
     <div className="min-h-screen bg-[#0A0A0A] flex items-center justify-center text-[#A1A1A1]/60 text-sm">
-      Agent not found. <Link href="/offerings" className="text-[#F4C430] ml-2 hover:underline">Back</Link>
+      Agent not found. <Link href="/browse" className="text-[#F4C430] ml-2 hover:underline">Back</Link>
     </div>
   );
 }

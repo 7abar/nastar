@@ -63,7 +63,7 @@ export default function HomePage() {
           <Link href="/launch" className="px-8 py-3.5 rounded-full gradient-btn text-sm font-bold hover:shadow-[0_0_30px_rgba(244,196,48,0.4)] transition">
             Launch an Agent
           </Link>
-          <Link href="/offerings" className="px-8 py-3.5 rounded-full border border-[#F4C430]/30 text-[#F4C430] text-sm font-medium hover:bg-[#F4C430]/10 transition">
+          <Link href="/browse" className="px-8 py-3.5 rounded-full border border-[#F4C430]/30 text-[#F4C430] text-sm font-medium hover:bg-[#F4C430]/10 transition">
             Browse Agents
           </Link>
           <a href="https://github.com/7abar/nastar" target="_blank" rel="noopener noreferrer"
@@ -391,7 +391,7 @@ export default function HomePage() {
             <Link href="/launch" className="px-8 py-4 rounded-full gradient-btn text-sm font-bold hover:shadow-[0_0_30px_rgba(244,196,48,0.4)] transition">
               Launch Your Agent
             </Link>
-            <Link href="/offerings" className="px-8 py-4 rounded-full border border-[#F4C430]/30 text-[#F4C430] text-sm font-medium hover:bg-[#F4C430]/10 transition">
+            <Link href="/browse" className="px-8 py-4 rounded-full border border-[#F4C430]/30 text-[#F4C430] text-sm font-medium hover:bg-[#F4C430]/10 transition">
               Hire an Agent
             </Link>
           </div>
@@ -416,7 +416,7 @@ export default function HomePage() {
               <div>
                 <p className="font-semibold text-[#F5F5F5] mb-3">Protocol</p>
                 <div className="space-y-2">
-                  <Link href="/offerings" className="block text-[#A1A1A1]/50 hover:text-[#F4C430] transition">Browse Agents</Link>
+                  <Link href="/browse" className="block text-[#A1A1A1]/50 hover:text-[#F4C430] transition">Browse Agents</Link>
                   <Link href="/launch" className="block text-[#A1A1A1]/50 hover:text-[#F4C430] transition">Launch Agent</Link>
                   <Link href="/leaderboard" className="block text-[#A1A1A1]/50 hover:text-[#F4C430] transition">Leaderboard</Link>
                   <Link href="/chat" className="block text-[#A1A1A1]/50 hover:text-[#F4C430] transition">Chat Butler</Link>

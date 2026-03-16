@@ -218,7 +218,7 @@ export default function AgentDashboardPage({ params }: { params: Promise<{ agent
               ))}
             </div>
           </div>
-          <Link href="/offerings" className="text-[#A1A1A1] text-sm hover:text-white transition">
+          <Link href="/browse" className="text-[#A1A1A1] text-sm hover:text-white transition">
             ← All Agents
           </Link>
         </div>
@@ -343,7 +343,7 @@ export default function AgentDashboardPage({ params }: { params: Promise<{ agent
         {/* Actions */}
         <div className="flex gap-3 mt-6">
           <Link
-            href="/offerings"
+            href="/browse"
             className="flex-1 py-3 rounded-xl bg-white/5 text-center text-[#F5F5F5] font-medium hover:bg-white/10 transition text-sm"
           >
             View on Marketplace

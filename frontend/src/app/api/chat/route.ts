@@ -94,7 +94,7 @@ const FAQ_CACHE: { patterns: RegExp[]; answer: string }[] = [
   {
     patterns: [/price|harga|how much|berapa/i],
     answer:
-      "Each agent sets their own price. You can see prices on /offerings or ask me about a specific service. Payment is locked in escrow and auto-released on delivery (with autoConfirm).",
+      "Each agent sets their own price. You can see prices on /browse or ask me about a specific service. Payment is locked in escrow and auto-released on delivery (with autoConfirm).",
   },
   {
     patterns: [/escrow.*protect|escrow.*work|how.*escrow|protect.*buyer|protect.*seller/i],
@@ -220,7 +220,7 @@ Escrow flow: Buyer locks payment → agent delivers → auto-releases. Disputes:
 
 vs ACP: Nastar uses real stablecoins (not VIRTUAL token), fully on-chain escrow, AI judge, portable identity, MiniPay (10M+ users).
 
-Pages: /offerings (browse), /leaderboard (rankings), /launch (deploy agent), /faq, /settings.
+Pages: /browse (browse), /leaderboard (rankings), /launch (deploy agent), /faq, /settings.
 
 When user says "I want to hire [agent]" or similar:
 1. Brief intro of the agent (1 sentence)
@@ -247,7 +247,7 @@ export async function POST(req: NextRequest) {
   const { allowed, remaining } = checkRateLimit(walletId);
   if (!allowed) {
     return NextResponse.json({
-      reply: `You've reached the chat limit (${RATE_LIMIT} messages/hour). Try again later, or browse /offerings to find agents directly.`,
+      reply: `You've reached the chat limit (${RATE_LIMIT} messages/hour). Try again later, or browse /browse to find agents directly.`,
       rateLimit: { remaining: 0, limit: RATE_LIMIT },
     });
   }
@@ -268,7 +268,7 @@ export async function POST(req: NextRequest) {
   // 3. Daily budget check (protects API key)
   if (!checkDailyBudget()) {
     return NextResponse.json({
-      reply: "The butler is resting for today — daily chat limit reached. Browse /offerings to find agents directly, or check /faq for answers.",
+      reply: "The butler is resting for today — daily chat limit reached. Browse /browse to find agents directly, or check /faq for answers.",
       rateLimit: { remaining, limit: RATE_LIMIT },
     });
   }
@@ -279,7 +279,7 @@ export async function POST(req: NextRequest) {
 
   if (!anthropicKey && !openaiKey) {
     // No LLM key — give a smart fallback based on the question
-    const fallback = `I can answer common questions from my knowledge base, but for deeper conversations I need an LLM connection. Here's what I know about Nastar:\n\n• Trustless AI agent marketplace on Celo\n• On-chain escrow with AI dispute resolution\n• 16 Mento stablecoins supported\n• ERC-8004 portable agent identity\n• No-code agent launcher with gas sponsorship\n\nCheck /faq for detailed answers, or browse /offerings to find agents.`;
+    const fallback = `I can answer common questions from my knowledge base, but for deeper conversations I need an LLM connection. Here's what I know about Nastar:\n\n• Trustless AI agent marketplace on Celo\n• On-chain escrow with AI dispute resolution\n• 16 Mento stablecoins supported\n• ERC-8004 portable agent identity\n• No-code agent launcher with gas sponsorship\n\nCheck /faq for detailed answers, or browse /browse to find agents.`;
     return NextResponse.json({
       reply: fallback,
       rateLimit: { remaining, limit: RATE_LIMIT },

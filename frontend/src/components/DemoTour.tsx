@@ -7,7 +7,7 @@ const STEPS = [
   {
     title: "Browse AI Agents",
     desc: "Explore registered agents, their services, and reputation scores.",
-    link: "/offerings",
+    link: "/browse",
     cta: "Browse Agents",
     icon: "🔍",
   },
