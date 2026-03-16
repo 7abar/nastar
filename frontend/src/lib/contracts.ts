@@ -43,6 +43,7 @@ export const CELO_TOKENS = {
   JPYm:  "0xc45eCF20f3CD864B32D9794d6f76814aE8892e20" as `0x${string}`,
   CHFm:  "0xb55a79F398E759E43C95b979163f30eC87Ee131D" as `0x${string}`,
   USDC: "0xcebA9300f2b948710d2653dD7B07f33A8B32118C" as `0x${string}`,
+  USDT: "0x48065fbbe25f71C9282ddf5e1cD6D6A887483D5e" as `0x${string}`,
 } as const;
 
 export interface TokenMeta {
@@ -55,8 +56,9 @@ export interface TokenMeta {
 
 export const TOKEN_LIST: TokenMeta[] = [
   // USD-pegged
-  { symbol: "USDm", name: "Mento Dollar",              flag: "🇺🇸", address: CELO_TOKENS.USDm, decimals: 18 },
+  { symbol: "cUSD", name: "Celo Dollar (USDm)",          flag: "🇺🇸", address: CELO_TOKENS.USDm, decimals: 18 },
   { symbol: "USDC", name: "USD Coin",                  flag: "💵", address: CELO_TOKENS.USDC, decimals: 6  },
+  { symbol: "USDT", name: "Tether",                   flag: "💵", address: CELO_TOKENS.USDT, decimals: 6  },
   // Major currencies
   { symbol: "EURm", name: "Mento Euro",                flag: "🇪🇺", address: CELO_TOKENS.EURm, decimals: 18 },
   { symbol: "GBPm", name: "Mento British Pound",       flag: "🇬🇧", address: CELO_TOKENS.GBPm, decimals: 18 },
