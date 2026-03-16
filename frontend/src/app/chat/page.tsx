@@ -71,6 +71,9 @@ function ChatPage() {
   const [withdrawToken, setWithdrawToken] = useState("cUSD");
   const [withdrawing, setWithdrawing] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [chatSessions, setChatSessions] = useState<{ id: string; title: string; date: number }[]>([]);
+  const [currentSessionId, setCurrentSessionId] = useState<string>(() => `chat-${Date.now()}`);
   const [selectedPayToken, setSelectedPayToken] = useState(CELO_TOKENS.USDm); // default cUSD
   const PAY_TOKENS = [
     { symbol: "cUSD", address: CELO_TOKENS.USDm, decimals: 18, logo: "/tokens/cusd.svg" },
@@ -81,6 +84,69 @@ function ChatPage() {
   const messagesEnd = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const searchParams = useSearchParams();
+
+  // ── Chat History (localStorage) ──
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("nastar-chat-sessions");
+      if (stored) setChatSessions(JSON.parse(stored));
+    } catch {}
+  }, []);
+
+  // Save messages to current session whenever they change
+  useEffect(() => {
+    if (messages.length === 0) return;
+    try {
+      // Save message data (strip services to save space)
+      const slim = messages.map(m => ({ id: m.id, role: m.role, text: m.text }));
+      localStorage.setItem(`nastar-chat-${currentSessionId}`, JSON.stringify(slim));
+
+      // Update session list
+      const firstUserMsg = messages.find(m => m.role === "user");
+      const title = firstUserMsg?.text?.slice(0, 40) || "New chat";
+      setChatSessions(prev => {
+        const existing = prev.find(s => s.id === currentSessionId);
+        let updated: typeof prev;
+        if (existing) {
+          updated = prev.map(s => s.id === currentSessionId ? { ...s, title } : s);
+        } else {
+          updated = [{ id: currentSessionId, title, date: Date.now() }, ...prev];
+        }
+        // Keep last 20 sessions
+        const trimmed = updated.slice(0, 20);
+        localStorage.setItem("nastar-chat-sessions", JSON.stringify(trimmed));
+        return trimmed;
+      });
+    } catch {}
+  }, [messages, currentSessionId]);
+
+  function loadSession(sessionId: string) {
+    try {
+      const data = localStorage.getItem(`nastar-chat-${sessionId}`);
+      if (data) {
+        setMessages(JSON.parse(data));
+        setCurrentSessionId(sessionId);
+        setShowHistory(false);
+      }
+    } catch {}
+  }
+
+  function startNewChat() {
+    setMessages([]);
+    setCurrentSessionId(`chat-${Date.now()}`);
+    setPrefilled(false);
+    setShowHistory(false);
+  }
+
+  function deleteSession(sessionId: string) {
+    localStorage.removeItem(`nastar-chat-${sessionId}`);
+    setChatSessions(prev => {
+      const updated = prev.filter(s => s.id !== sessionId);
+      localStorage.setItem("nastar-chat-sessions", JSON.stringify(updated));
+      return updated;
+    });
+    if (currentSessionId === sessionId) startNewChat();
+  }
 
   // Auto-create/fetch Nastar Wallet when user connects
   useEffect(() => {
@@ -350,23 +416,66 @@ function ChatPage() {
       <PageTitle title="Chat" />
       {/* Chat Header */}
       <div className="border-b border-white/[0.06] px-4 py-3">
-        <div className="max-w-2xl mx-auto flex items-center gap-3">
-          <a href="/browse" className="w-8 h-8 rounded-lg bg-white/[0.04] flex items-center justify-center text-[#A1A1A1] hover:text-white hover:bg-white/[0.08] transition">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
-            </svg>
-          </a>
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-full overflow-hidden">
-              <img src="/nastar-mascot.png" alt="" className="w-full h-full object-cover" />
-            </div>
-            <div>
-              <span className="text-[#F5F5F5] text-sm font-medium">Nastar Butler</span>
-              <span className="text-green-400 text-[10px] ml-2">Online</span>
+        <div className="max-w-2xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <button onClick={() => setShowHistory(!showHistory)} className="w-8 h-8 rounded-lg bg-white/[0.04] flex items-center justify-center text-[#A1A1A1] hover:text-white hover:bg-white/[0.08] transition" title="Chat history">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </button>
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-full overflow-hidden">
+                <img src="/nastar-mascot.png" alt="" className="w-full h-full object-cover" />
+              </div>
+              <div>
+                <span className="text-[#F5F5F5] text-sm font-medium">Nastar Butler</span>
+                <span className="text-green-400 text-[10px] ml-2">Online</span>
+              </div>
             </div>
           </div>
+          <button onClick={startNewChat} className="w-8 h-8 rounded-lg bg-white/[0.04] flex items-center justify-center text-[#A1A1A1] hover:text-white hover:bg-white/[0.08] transition" title="New chat">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+          </button>
         </div>
       </div>
+
+      {/* History Sidebar */}
+      {showHistory && (
+        <div className="fixed inset-0 z-50 flex" onClick={() => setShowHistory(false)}>
+          <div className="w-72 h-full bg-[#111] border-r border-white/[0.06] overflow-y-auto shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="p-4 border-b border-white/[0.06] flex items-center justify-between">
+              <span className="text-[#F5F5F5] text-sm font-semibold">History</span>
+              <button onClick={startNewChat} className="text-[#F4C430] text-xs font-medium hover:underline">+ New Chat</button>
+            </div>
+            {chatSessions.length === 0 && (
+              <p className="text-[#A1A1A1] text-xs p-4">No chat history yet</p>
+            )}
+            {chatSessions.map((s) => (
+              <div
+                key={s.id}
+                className={`group flex items-center gap-2 px-4 py-3 cursor-pointer border-b border-white/[0.03] hover:bg-white/[0.04] transition ${s.id === currentSessionId ? "bg-[#F4C430]/10" : ""}`}
+              >
+                <button onClick={() => loadSession(s.id)} className="flex-1 text-left min-w-0">
+                  <p className="text-[#E5E5E5] text-sm truncate">{s.title}</p>
+                  <p className="text-[#666] text-[10px]">{new Date(s.date).toLocaleDateString()}</p>
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); deleteSession(s.id); }}
+                  className="opacity-0 group-hover:opacity-100 text-[#666] hover:text-red-400 transition p-1"
+                  title="Delete"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            ))}
+          </div>
+          <div className="flex-1 bg-black/50 backdrop-blur-sm" />
+        </div>
+      )}
       {/* Messages */}
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-2xl mx-auto px-4 py-6 space-y-4">
