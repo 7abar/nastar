@@ -1180,10 +1180,7 @@ export default function LaunchPage() {
                 <div className="text-sm font-bold text-[#F4C430] font-mono">{config.llmModel}</div>
                 <div className="text-[#A1A1A1]/40 text-[10px] mt-0.5">LLM</div>
               </div>
-              <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.08]">
-                <div className="text-sm font-bold text-[#F4C430]">${config.dailyLimitUsd}</div>
-                <div className="text-[#A1A1A1]/40 text-[10px] mt-0.5">Daily limit</div>
-              </div>
+
             </div>
 
             <div className="p-4 rounded-xl bg-green-500/5 border border-green-500/20">
