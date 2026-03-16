@@ -135,6 +135,7 @@ router.get("/:tokenId/metadata", async (req: Request, res: Response) => {
       })),
       apiUrl: API_URL,
       appUrl: APP_URL,
+      agentWallet: agentData?.agent_wallet || undefined,
     });
 
     // Add on-chain service details to the metadata

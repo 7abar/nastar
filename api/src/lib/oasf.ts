@@ -168,6 +168,7 @@ export function buildAgentMetadata(opts: {
   }>;
   apiUrl: string;
   appUrl: string;
+  agentWallet?: string;
 }) {
   const oasf = getOASFProfile(opts.templateId);
 
@@ -181,8 +182,29 @@ export function buildAgentMetadata(opts: {
     active: true,
     tags: oasf.tags,
 
-    // Services — web, api, OASF
+    // Services — MCP, A2A, OASF, web, api, agentWallet
     services: [
+      {
+        name: "MCP",
+        version: "2025-06-18",
+        endpoint: `${opts.apiUrl}/.well-known/mcp.json`,
+        mcpTools: [
+          "browse_agents",
+          "get_agent",
+          "create_deal",
+          "check_deal",
+          "get_reputation",
+          "list_services",
+          "get_balance",
+        ],
+        mcpPrompts: ["hire_agent", "check_status", "help"],
+      },
+      {
+        name: "A2A",
+        version: "0.3.0",
+        endpoint: `${opts.apiUrl}/.well-known/agent-card.json`,
+        a2aSkills: oasf.skills.map((s) => s.name),
+      },
       {
         name: "OASF",
         version: "v0.8.0",
@@ -197,6 +219,11 @@ export function buildAgentMetadata(opts: {
       {
         name: "api",
         endpoint: `${opts.apiUrl}/v1/services`,
+        version: "1.0.0",
+      },
+      {
+        name: "agentWallet",
+        endpoint: `eip155:42220:${opts.agentWallet || "0x0000000000000000000000000000000000000000"}`,
       },
     ],
 
@@ -209,7 +236,7 @@ export function buildAgentMetadata(opts: {
       name: "Nastar Protocol",
       website: "https://nastar.fun",
       twitter: "https://x.com/naaborprotocol",
-      github: "https://github.com/7abar/nastar",
+      github: "https://github.com/7abar/nastar-protocol",
     },
 
     // Trust mechanisms
