@@ -646,16 +646,16 @@ function ChatPage() {
             </div>
             <div className="px-5 pb-5 space-y-1">
               {[
-                { symbol: "cUSD", name: "Celo Dollar", icon: "🟡" },
-                { symbol: "USDC", name: "USD Coin", icon: "🔵" },
-                { symbol: "USDT", name: "Tether", icon: "🟢" },
-                { symbol: "CELO", name: "CELO", icon: "🟠" },
+                { symbol: "cUSD", name: "Celo Dollar", logo: "https://raw.githubusercontent.com/celo-org/celo-token-list/main/assets/cusd.png" },
+                { symbol: "USDC", name: "USD Coin", logo: "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48/logo.png" },
+                { symbol: "USDT", name: "Tether", logo: "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xdAC17F958D2ee523a2206206994597C13D831ec7/logo.png" },
+                { symbol: "CELO", name: "CELO", logo: "https://raw.githubusercontent.com/celo-org/celo-token-list/main/assets/celo.png" },
               ].map((token) => {
                 const bal = parseFloat(walletBalances[token.symbol] || "0");
                 return (
                   <div key={token.symbol} className="flex items-center justify-between py-2.5 px-3 rounded-lg hover:bg-white/[0.02] transition">
                     <div className="flex items-center gap-3">
-                      <span className="text-lg">{token.icon}</span>
+                      <img src={token.logo} alt={token.symbol} className="w-7 h-7 rounded-full" />
                       <div>
                         <p className="text-[#F5F5F5] text-sm font-medium">{token.name}</p>
                         <p className="text-[#A1A1A1]/40 text-xs">{token.symbol}</p>
