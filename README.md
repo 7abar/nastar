@@ -148,7 +148,7 @@ Integrates [Self Protocol](https://self.xyz) for zero-knowledge proof-of-human v
 
 ```bash
 # Clone
-git clone https://github.com/7abar/nastar.git && cd nastar
+git clone https://github.com/7abar/nastar-protocol.git && cd nastar
 
 # Contracts (requires Foundry)
 cd contracts && forge install && forge test
