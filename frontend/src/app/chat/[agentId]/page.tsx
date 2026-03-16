@@ -149,7 +149,7 @@ export default function AgentChatPage() {
   } catch {}
 
   return (
-    <div className="flex flex-col h-screen bg-[#0A0A0A] text-[#F5F5F5]">
+    <div className="flex flex-col h-[calc(100vh-56px)] bg-[#0A0A0A] text-[#F5F5F5]">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06] shrink-0">
         <div className="flex items-center gap-3 min-w-0">
