@@ -201,6 +201,9 @@ function ChatPage() {
     const agentName = hireName || searchParams.get("name");
     const mode = searchParams.get("mode");
 
+    // Wait for services to load before showing hire info
+    if ((agentId || hireId) && services.length === 0) return;
+
     // Agent work mode — requires a confirmed deal
     if (mode === "work" && agentId && agentName) {
       const dealId = searchParams.get("dealId");
@@ -208,13 +211,11 @@ function ChatPage() {
       setAgentMode({ id: agentId, name: agentName });
 
       if (dealId) {
-        // Real deal exists — show working state
         addMsg({
           role: "assistant",
           text: `Hi! I'm **${agentName}**. Deal #${dealId} is confirmed — payment is locked in escrow.\n\nDescribe exactly what you need and I'll deliver with proof-of-work. Payment auto-releases on delivery.`,
         });
       } else {
-        // No deal — show agent's services and force hire first
         const agentServices = services.filter((s) => String(s.agentId) === String(agentId));
         if (agentServices.length > 0) {
           const serviceList = agentServices.map((s) => {
@@ -239,12 +240,9 @@ function ChatPage() {
 
     if (agentId && agentName) {
       setPrefilled(true);
-
-      // Find ALL services for this specific agent ID — no name searching
       const agentServices = services.filter((s) => String(s.agentId) === String(agentId));
 
       if (agentServices.length > 0) {
-        // Build service list
         const serviceList = agentServices.map((s) => {
           const price = formatUnits(s.pricePerCall, 18);
           return `- **${s.name}** — ${s.description || "Service"}\n  Price: **${price} USD**`;
@@ -257,11 +255,9 @@ function ChatPage() {
           serviceIndex: services.indexOf(agentServices[0]),
         });
       } else {
-        // Agent exists but no on-chain services yet
         addMsg({
           role: "assistant",
           text: `**${agentName}** (Agent #${agentId}) doesn't have on-chain services registered yet.\n\nYou can still chat with them directly to discuss your needs.`,
-          agentLink: { id: agentId, name: agentName },
         });
       }
     }
@@ -464,7 +460,7 @@ function ChatPage() {
 
       addMsg({
         role: "assistant",
-        text: `Job created (${jobId.slice(0, 8)}...).\n\n**${service.name}** — Agent #${service.agentId} is reviewing your request. Once they confirm, you'll approve payment and the job begins.\n\nTrack progress in your [Job Dashboard →](/jobs)`,
+        text: `Job created (${jobId.slice(0, 8)}...).\n\n**${service.name}** — Agent #${service.agentId} is reviewing your request. Once they confirm, you'll approve payment and the job begins.\n\nView agent profile to track progress.`,
         agentLink: { id: String(service.agentId), name: service.name, dealId: jobId },
       });
     } catch (err: unknown) {
@@ -674,9 +670,9 @@ function ChatPage() {
                   </a>
                 )}
                 {msg.agentLink && (
-                  <a href="/jobs"
+                  <a href={`/agents/${msg.agentLink.id}`}
                     className="block mt-3 w-full py-2.5 rounded-xl bg-[#F4C430] text-[#0A0A0A] text-sm font-bold text-center hover:shadow-[0_0_15px_rgba(244,196,48,0.3)] transition">
-                    View Job Dashboard →
+                    View Agent Profile →
                   </a>
                 )}
 

@@ -106,11 +106,10 @@ export default function AgentDetailPage() {
         const agentId = Number(id);
 
         // Fire ALL requests in parallel
-        const [servicesRes, lbRes, dealsRes, jobsRes, repRes, metaRes, sbRegistered, sbHosted] = await Promise.all([
+        const [servicesRes, lbRes, dealsRes, repRes, metaRes, sbRegistered, sbHosted] = await Promise.all([
           fetch(`${API_URL}/v1/services`).then(r => r.ok ? r.json() : []).catch(() => []),
           fetch(`${API_URL}/v1/leaderboard`).then(r => r.ok ? r.json() : []).catch(() => []),
           fetch(`${API_URL}/v1/deals/agent/${agentId}`).then(r => r.ok ? r.json() : []).catch(() => []),
-          fetch(`${API_URL}/v1/jobs?sellerAgentId=${agentId}&limit=20`).then(r => r.ok ? r.json() : {jobs:[]}).catch(() => ({jobs:[]})),
           fetch(`${API_URL}/v1/reputation/${agentId}`).then(r => r.ok ? r.json() : null).catch(() => null),
           fetch(`${API_URL}/api/agent/${agentId}/metadata`).then(r => r.ok ? r.json() : null).catch(() => null),
           Promise.resolve(supabase.from("registered_agents").select("name, description, avatar, agent_wallet").eq("agent_nft_id", agentId)).then(r => r.data?.[0] || null).catch(() => null),
@@ -123,8 +122,6 @@ export default function AgentDetailPage() {
 
         // Stats from on-chain leaderboard (real escrow data only)
         const lb = leaderboard.find((a: any) => a.agentId === agentId);
-        // Jobs from Supabase (for display, not revenue)
-        const allJobs = jobsRes.jobs || [];
 
         if (agentServices.length > 0) {
           setOnChainAgent({
@@ -135,30 +132,14 @@ export default function AgentDetailPage() {
             services: agentServices,
             revenue: lb?.revenue || "0",
             jobsCompleted: lb?.jobsCompleted || 0,
-            jobsTotal: (lb?.jobsTotal || 0) + allJobs.length,
+            jobsTotal: lb?.jobsTotal || 0,
             completionRate: lb?.completionRate || 0,
           });
         }
 
-        // Build job history for this agent
-        const phaseToLabel: Record<string, string> = {
-          OPEN: "Open", NEGOTIATION: "Negotiation", IN_PROGRESS: "Active",
-          COMPLETED: "Completed", REJECTED: "Rejected", EXPIRED: "Expired",
-        };
-        const newJobs = allJobs.map((j: any) => ({
-          dealId: j.deal_id || j.id,
-          buyerAgentId: j.buyer_address || "0",
-          sellerAgentId: agentId,
-          status: j.phase === "COMPLETED" ? 2 : j.phase === "IN_PROGRESS" ? 1 : 0,
-          statusLabel: phaseToLabel[j.phase] || j.phase,
-          amount: String(Math.round((j.amount_usd || 0) * 1e18)),
-          taskDescription: j.requirements?.task || j.offering_name || "",
-          createdAt: String(new Date(j.created_at).getTime() / 1000),
-          completedAt: "",
-          deliveryProof: j.delivery_proof || "",
-        }));
+        // On-chain deals only (from mainnet escrow contract)
         const validDeals = Array.isArray(dealsRes) ? dealsRes : [];
-        if (validDeals.length > 0 || newJobs.length > 0) setDeals([...validDeals, ...newJobs]);
+        if (validDeals.length > 0) setDeals(validDeals);
         if (repRes) setReputation(repRes);
         if (metaRes) setMetadata(metaRes);
 
