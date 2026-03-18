@@ -179,6 +179,25 @@ router.post("/deploy", async (req: Request, res: Response) => {
       // Non-critical — metadata URI can be set later
     }
 
+    // ── 4. Transfer ERC-8004 NFT to user's wallet ──────────────────────────────
+    // register() mints to msg.sender (server). Transfer ownership to the actual user.
+    try {
+      const TRANSFER_ABI = parseAbi([
+        "function transferFrom(address from, address to, uint256 tokenId)",
+      ]);
+      const transferHash = await walletClient.writeContract({
+        address: CONTRACTS.IDENTITY_REGISTRY as `0x${string}`,
+        abi: TRANSFER_ABI,
+        functionName: "transferFrom",
+        args: [account.address, ownerAddress as `0x${string}`, BigInt(agentNftId)],
+      });
+      await publicClient.waitForTransactionReceipt({ hash: transferHash });
+      txHashes.push(transferHash);
+    } catch (e: any) {
+      console.warn(`[sponsor] NFT transfer to ${ownerAddress} failed:`, e.message);
+      // Non-fatal — user can claim later
+    }
+
     // Auto-register on Molthunt (fire-and-forget, non-blocking)
     (async () => {
       try {
@@ -235,6 +254,89 @@ router.post("/deploy", async (req: Request, res: Response) => {
   } catch (err: any) {
     console.error("[sponsor] deploy error:", err.message);
     return res.status(500).json({ error: err.message?.slice(0, 200) || "Deploy failed" });
+  }
+});
+
+/**
+ * POST /v1/sponsor/gas
+ * Send a small amount of CELO to user's wallet for gas.
+ * User then transacts directly (owns their NFT + services).
+ *
+ * Anti-exploit:
+ * - Max 0.01 CELO per drip (enough for ~10 txs)
+ * - Max 2 drips per address per 24h
+ * - Max 5 drips per IP per 24h
+ * - Only sends if user balance < 0.005 CELO
+ */
+const GAS_DRIP = BigInt("10000000000000000"); // 0.01 CELO
+const dripByAddress = new Map<string, { count: number; resetAt: number }>();
+const dripByIp = new Map<string, { count: number; resetAt: number }>();
+const DRIP_WINDOW = 86400_000; // 24h
+const MAX_DRIPS_ADDR = 2;
+const MAX_DRIPS_IP = 5;
+const MIN_BALANCE = BigInt("5000000000000000"); // 0.005 CELO — don't drip if user has more
+
+router.post("/gas", async (req: Request, res: Response) => {
+  try {
+    const { address } = req.body;
+    if (!address || !/^0x[0-9a-fA-F]{40}$/.test(address)) {
+      return res.status(400).json({ error: "Valid address required" });
+    }
+
+    const pk = process.env.PRIVATE_KEY;
+    if (!pk) return res.status(500).json({ error: "Sponsor wallet not configured" });
+
+    const now = Date.now();
+    const clientIp = req.ip || req.headers["x-forwarded-for"]?.toString() || "unknown";
+    const addrKey = address.toLowerCase();
+
+    // Rate limit by address
+    const addrEntry = dripByAddress.get(addrKey);
+    if (addrEntry && now < addrEntry.resetAt) {
+      if (addrEntry.count >= MAX_DRIPS_ADDR) {
+        return res.status(429).json({ error: "Gas drip limit reached for this address (max 2/day)" });
+      }
+      addrEntry.count++;
+    } else {
+      dripByAddress.set(addrKey, { count: 1, resetAt: now + DRIP_WINDOW });
+    }
+
+    // Rate limit by IP
+    const ipEntry = dripByIp.get(clientIp);
+    if (ipEntry && now < ipEntry.resetAt) {
+      if (ipEntry.count >= MAX_DRIPS_IP) {
+        return res.status(429).json({ error: "Gas drip limit reached for this IP (max 5/day)" });
+      }
+      ipEntry.count++;
+    } else {
+      dripByIp.set(clientIp, { count: 1, resetAt: now + DRIP_WINDOW });
+    }
+
+    // Check user's current CELO balance
+    const userBalance = await publicClient.getBalance({ address: address as `0x${string}` });
+    if (userBalance >= MIN_BALANCE) {
+      return res.json({ success: true, skipped: true, reason: "User already has enough CELO", balance: Number(userBalance) / 1e18 });
+    }
+
+    // Send gas drip
+    const account = privateKeyToAccount(pk as `0x${string}`);
+    const walletClient = createWalletClient({ account, chain: celo, transport: http(CELO_RPC) });
+
+    const txHash = await walletClient.sendTransaction({
+      to: address as `0x${string}`,
+      value: GAS_DRIP,
+    });
+    await publicClient.waitForTransactionReceipt({ hash: txHash });
+
+    return res.json({
+      success: true,
+      txHash,
+      amount: "0.01",
+      currency: "CELO",
+    });
+  } catch (err: any) {
+    console.error("[sponsor] gas drip error:", err.message);
+    return res.status(500).json({ error: err.message?.slice(0, 200) || "Gas drip failed" });
   }
 });
 

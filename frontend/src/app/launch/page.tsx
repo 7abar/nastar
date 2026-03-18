@@ -4,7 +4,7 @@ export const dynamic = "force-dynamic";
 import { useState } from "react";
 import { usePrivy, useWallets } from "@privy-io/react-auth";
 import { useRouter } from "next/navigation";
-import { createPublicClient, http, encodeFunctionData } from "viem";
+import { createPublicClient, createWalletClient, custom, http, encodeFunctionData } from "viem";
 import {
   celoSepoliaCustom,
   CONTRACTS,
@@ -404,37 +404,114 @@ export default function LaunchPage() {
       const provider = await wallet.getEthereumProvider();
       const ownerAddress = wallet.address as `0x${string}`;
 
+      // Create viem clients from user's Privy wallet
+      const publicClient = createPublicClient({ chain: celoSepoliaCustom, transport: http() });
+      const walletClient = createWalletClient({
+        account: ownerAddress,
+        chain: celoSepoliaCustom,
+        transport: custom(provider),
+      });
+
       // 1. Generate agent wallet
       setStatus("Generating agent wallet...");
       const agentWallet = generateAgentWallet();
 
-      // 2. Gas-Sponsored Deployment (server pays gas)
-      setStatus("Deploying agent on-chain (gas sponsored)...");
+      // 2. Request gas from sponsor (user's wallet will transact directly)
+      setStatus("Getting gas for deployment...");
+      const gasRes = await fetch(`${API_URL}/v1/sponsor/gas`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ address: ownerAddress }),
+      });
+      if (!gasRes.ok) {
+        const errData = await gasRes.json().catch(() => ({}));
+        throw new Error(errData.error || "Gas sponsorship failed");
+      }
+
+      // 3. Mint ERC-8004 Identity NFT (user's wallet — user owns the NFT)
+      setStatus("Minting agent identity (ERC-8004)...");
+      const mintHash = await walletClient.writeContract({
+        address: CONTRACTS.IDENTITY_REGISTRY as `0x${string}`,
+        abi: [{
+          type: "function", name: "register", inputs: [], outputs: [{ type: "uint256" }], stateMutability: "nonpayable",
+        }],
+        functionName: "register",
+      });
+      const mintReceipt = await publicClient.waitForTransactionReceipt({ hash: mintHash });
+
+      // Extract tokenId from Transfer event
+      const transferLog = mintReceipt.logs.find(
+        (l) => l.topics[0] === "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+      );
+      let agentNftId: number | null = null;
+      if (transferLog?.topics[3]) {
+        agentNftId = Number(BigInt(transferLog.topics[3]));
+      }
+      if (agentNftId === null) throw new Error("Failed to mint agent identity");
+
+      // 4. Register Service (user's wallet — user is the provider)
+      setStatus("Registering service on-chain...");
       const primaryOffering = config.offerings[0];
       const feeForChain = BigInt(Math.floor(parseFloat(primaryOffering.fee) * 1e18));
       const tagList = config.tags.split(",").map((t: string) => t.trim()).filter(Boolean);
+      const tagBytes = tagList.map((t: string) =>
+        `0x${Array.from(new TextEncoder().encode(t.padEnd(32, "\0"))).slice(0, 32).map(b => b.toString(16).padStart(2, "0")).join("")}` as `0x${string}`
+      );
 
-      const sponsorRes = await fetch(`${API_URL}/v1/sponsor/deploy`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ownerAddress,
-          name: config.name,
-          description: primaryOffering.description,
-          endpoint: `${API_URL}/api/agent/endpoint`,
-          paymentToken: primaryOffering.paymentToken,
-          pricePerCall: feeForChain.toString(),
-          tags: tagList,
-        }),
+      const svcHash = await walletClient.writeContract({
+        address: CONTRACTS.SERVICE_REGISTRY as `0x${string}`,
+        abi: [{
+          type: "function", name: "registerService",
+          inputs: [
+            { name: "agentId", type: "uint256" },
+            { name: "name", type: "string" },
+            { name: "description", type: "string" },
+            { name: "endpoint", type: "string" },
+            { name: "paymentToken", type: "address" },
+            { name: "pricePerCall", type: "uint256" },
+            { name: "tags", type: "bytes32[]" },
+          ],
+          outputs: [{ type: "uint256" }], stateMutability: "nonpayable",
+        }],
+        functionName: "registerService",
+        args: [
+          BigInt(agentNftId),
+          config.name,
+          primaryOffering.description || "",
+          `${API_URL}/api/agent/endpoint`,
+          (primaryOffering.paymentToken || "0x0000000000000000000000000000000000000000") as `0x${string}`,
+          feeForChain,
+          tagBytes,
+        ],
       });
+      await publicClient.waitForTransactionReceipt({ hash: svcHash });
 
-      if (!sponsorRes.ok) {
-        const errData = await sponsorRes.json().catch(() => ({}));
-        throw new Error(errData.error || "Sponsored deployment failed");
+      // 5. Set metadata URI
+      setStatus("Setting agent metadata...");
+      try {
+        await walletClient.writeContract({
+          address: CONTRACTS.IDENTITY_REGISTRY as `0x${string}`,
+          abi: [{
+            type: "function", name: "setAgentURI",
+            inputs: [{ name: "tokenId", type: "uint256" }, { name: "agentURI", type: "string" }],
+            outputs: [], stateMutability: "nonpayable",
+          }],
+          functionName: "setAgentURI",
+          args: [BigInt(agentNftId), `${API_URL}/api/agent/${agentNftId}/metadata`],
+        });
+      } catch {
+        // Non-critical
       }
 
-      const sponsorData = await sponsorRes.json();
-      const agentNftId = sponsorData.agentNftId as number | null;
+      // Get serviceId
+      const nextServiceId = await publicClient.readContract({
+        address: CONTRACTS.SERVICE_REGISTRY as `0x${string}`,
+        abi: [{
+          type: "function", name: "nextServiceId", inputs: [], outputs: [{ type: "uint256" }], stateMutability: "view",
+        }],
+        functionName: "nextServiceId",
+      });
+      const sponsorData = { serviceId: Number(nextServiceId as bigint) - 1 };
 
       // 4. Store agent config + register hosted runtime
       setStatus("Storing agent configuration...");
