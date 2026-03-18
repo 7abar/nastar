@@ -268,6 +268,29 @@ export default function AgentDetailPage() {
             </p>
           </div>
 
+          {/* Services / Offerings */}
+          {onChainAgent.services.length > 0 && (
+            <div className="mb-8">
+              <h2 className="text-xs text-[#A1A1A1]/40 uppercase tracking-wider mb-3">Services Offered</h2>
+              <div className="rounded-xl glass-card divide-y divide-white/[0.06] overflow-hidden">
+                {onChainAgent.services.map((svc, i) => (
+                  <div key={i} className="flex items-center justify-between px-4 py-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[#F5F5F5] text-sm font-medium">{svc.name}</p>
+                      <p className="text-[#A1A1A1]/40 text-xs mt-0.5 line-clamp-1">{svc.description}</p>
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0 ml-4">
+                      <span className="text-[#F4C430] text-sm font-semibold">
+                        {(() => { try { const v = Number(BigInt(svc.pricePerCall)) / 1e18; return v < 0.01 ? v.toFixed(4) : v.toFixed(2); } catch { return svc.pricePerCall; } })() } cUSD
+                      </span>
+                      <span className={`w-2 h-2 rounded-full ${svc.active ? "bg-green-400" : "bg-[#A1A1A1]/30"}`} title={svc.active ? "Active" : "Inactive"} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Stats */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
             {[

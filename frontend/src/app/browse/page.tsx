@@ -249,9 +249,57 @@ export default function OfferingsPage() {
   }
   const agents = Array.from(agentMap.values());
 
+  // ── Build all offerings (on-chain + tag-derived) ──────────────────────────
+
+  interface Offering {
+    agentId: string;
+    name: string;
+    description: string;
+    price: string;
+    agentName: string;
+    avatar: string;
+    token: string;
+  }
+
+  const allOfferings: Offering[] = [];
+
+  // On-chain services first
+  for (const svc of services) {
+    const stored = storedAgents.get(svc.agentId);
+    allOfferings.push({
+      agentId: svc.agentId,
+      name: svc.name,
+      description: svc.description,
+      price: formatPrice(svc.pricePerCall),
+      agentName: stored?.name || svc.name,
+      avatar: stored?.avatar || "",
+      token: getTokenSymbol(svc.paymentToken),
+    });
+  }
+
+  // Tag-derived sub-offerings from agents (only add if agent has tags and they weren't already added as on-chain services)
+  for (const agent of agents) {
+    const onChainNames = new Set(
+      services.filter((s) => s.agentId === agent.agentId).map((s) => s.name.toLowerCase())
+    );
+    for (const svc of agent.services) {
+      if (!onChainNames.has(svc.name.toLowerCase())) {
+        allOfferings.push({
+          agentId: agent.agentId,
+          name: svc.name,
+          description: svc.description || agent.description,
+          price: svc.price,
+          agentName: agent.name,
+          avatar: agent.avatar,
+          token: "cUSD",
+        });
+      }
+    }
+  }
+
   // ── Filter ───────────────────────────────────────────────────────────────
 
-  const filtered = services.filter((s) => {
+  const filtered = allOfferings.filter((s) => {
     if (!matchCategory(s.name, s.description, category)) return false;
     if (search) {
       const q = search.toLowerCase();
@@ -274,7 +322,7 @@ export default function OfferingsPage() {
         <div className="mb-6">
           <h1 className="text-3xl font-bold mb-1">Browse</h1>
           <p className="text-[#A1A1A1]/60 text-sm">
-            {agents.length} agent{agents.length !== 1 && "s"}{services.length > 0 && ` · ${services.length} service${services.length !== 1 ? "s" : ""}`}
+            {agents.length} agent{agents.length !== 1 && "s"}{allOfferings.length > 0 && ` · ${allOfferings.length} offering${allOfferings.length !== 1 ? "s" : ""}`}
           </p>
         </div>
 
@@ -346,38 +394,29 @@ export default function OfferingsPage() {
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {filtered.map((svc, idx) => {
-                  const stored = storedAgents.get(svc.agentId);
-                  const agentName = stored?.name || svc.name;
-                  const avatar = stored?.avatar || "";
-                  const token = getTokenSymbol(svc.paymentToken);
-
-                  return (
+                {filtered.map((svc, idx) => (
                     <Link key={idx} href={`/agents/${svc.agentId}`}
                       className="p-5 rounded-xl border border-white/[0.08] bg-white/[0.02] hover:border-[#F4C430]/40 transition group flex flex-col min-h-[180px]">
-                      {/* Service name */}
-                      <h3 className="font-bold text-[#F5F5F5] text-sm mb-2 group-hover:text-[#F4C430] transition truncate">{svc.name}</h3>
-
-                      {/* Description */}
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-base">{getServiceIcon(svc.name)}</span>
+                        <h3 className="font-bold text-[#F5F5F5] text-sm group-hover:text-[#F4C430] transition truncate">{svc.name}</h3>
+                      </div>
                       <p className="text-[#A1A1A1]/50 text-xs leading-relaxed flex-1 line-clamp-3 mb-4">{svc.description}</p>
-
-                      {/* Bottom: avatar + agent name + price */}
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2 min-w-0">
                           <div className="w-6 h-6 rounded-full bg-gradient-to-br from-[#F4C430]/20 to-[#FF9F1C]/10 flex items-center justify-center overflow-hidden shrink-0">
-                            {avatar && avatar.startsWith("http") ? (
-                              <img src={avatar} alt="" className="w-full h-full object-cover" />
+                            {svc.avatar && svc.avatar.startsWith("http") ? (
+                              <img src={svc.avatar} alt="" className="w-full h-full object-cover" />
                             ) : (
-                              <span className="text-[9px] font-bold text-[#F4C430]">{agentName.charAt(0).toUpperCase()}</span>
+                              <span className="text-[9px] font-bold text-[#F4C430]">{svc.agentName.charAt(0).toUpperCase()}</span>
                             )}
                           </div>
-                          <span className="text-[#A1A1A1]/60 text-xs truncate">by {agentName}</span>
+                          <span className="text-[#A1A1A1]/60 text-xs truncate">by {svc.agentName}</span>
                         </div>
-                        <span className="text-[#F4C430] font-semibold text-xs shrink-0 ml-2">{formatPrice(svc.pricePerCall)} {token}</span>
+                        <span className="text-[#F4C430] font-semibold text-xs shrink-0 ml-2">{svc.price} {svc.token}</span>
                       </div>
                     </Link>
-                  );
-                })}
+                  ))}
               </div>
             )}
           </>
