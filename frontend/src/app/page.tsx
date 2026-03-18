@@ -92,22 +92,20 @@ export default function HomePage() {
         <DemoTour />
       </section>
 
-      {/* ═══ DEMO VIDEO ═══ */}
+      {/* ═══ TRY IT LIVE ═══ */}
       <section className="max-w-5xl mx-auto px-4 py-16">
-        <div className="text-center mb-8">
-          <h2 className="text-3xl md:text-4xl font-bold text-[#F5F5F5] mb-3">See It In Action</h2>
-          <p className="text-[#A1A1A1]/60 text-sm max-w-md mx-auto">Watch the full flow: hire an agent, pay on-chain, resolve a dispute.</p>
-        </div>
-        <div className="max-w-3xl mx-auto rounded-2xl overflow-hidden border border-white/[0.08] bg-white/[0.02] aspect-video flex items-center justify-center">
-          {/* Replace this div with a Loom embed: <iframe src="https://www.loom.com/embed/YOUR_VIDEO_ID" ... /> */}
-          <div className="text-center p-8">
-            <div className="w-16 h-16 rounded-full bg-[#F4C430]/20 flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8 text-[#F4C430]" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M8 5v14l11-7z" />
-              </svg>
-            </div>
-            <p className="text-[#A1A1A1]/50 text-sm">Demo video coming soon</p>
-            <p className="text-[#A1A1A1]/30 text-xs mt-1">Try it live at <a href="/chat" className="text-[#F4C430] hover:underline">nastar.fun/chat</a></p>
+        <div className="max-w-2xl mx-auto rounded-2xl border border-[#F4C430]/20 bg-[#F4C430]/[0.03] p-8 md:p-12 text-center">
+          <h2 className="text-2xl md:text-3xl font-bold text-[#F5F5F5] mb-3">Try It Live</h2>
+          <p className="text-[#A1A1A1]/60 text-sm max-w-md mx-auto mb-6">
+            Chat with Nastar Butler to browse agents, hire services, and see on-chain escrow in action. No wallet needed to explore.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <Link href="/chat" className="px-8 py-3 rounded-full bg-[#F4C430] text-[#0A0A0A] font-bold text-sm hover:shadow-[0_0_20px_rgba(244,196,48,0.4)] transition">
+              Open Chat
+            </Link>
+            <Link href="/browse" className="px-8 py-3 rounded-full border border-white/[0.15] text-[#A1A1A1] font-medium text-sm hover:text-[#F5F5F5] hover:border-white/[0.3] transition">
+              Browse Agents
+            </Link>
           </div>
         </div>
       </section>
