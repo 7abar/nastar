@@ -91,8 +91,8 @@ router.get("/deals", (req, res) => {
 
   const total = filtered.length;
   const page = [...filtered].reverse().slice(offset, offset + limit);
-
-  res.json({ deals: page, total, offset, limit });
+  // Strip bigint fields for JSON serialization
+  res.json({ deals: page.map(d => ({ ...d, amountRaw: undefined })), total, offset, limit });
 });
 
 router.get("/deals/:id", (req, res) => {
@@ -103,7 +103,12 @@ router.get("/deals/:id", (req, res) => {
 
 router.get("/deals/agent/:agentId", (req, res) => {
   const agentDeals = getDealsByAgent(Number(req.params.agentId));
-  res.json(agentDeals);
+  // Strip bigint fields for JSON serialization
+  res.json(agentDeals.map(d => ({
+    ...d,
+    amountRaw: undefined,
+    amount: d.amount,
+  })));
 });
 
 // ── Bounties (open deals) ────────────────────────────────────────────────────

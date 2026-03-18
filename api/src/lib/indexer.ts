@@ -7,6 +7,7 @@ import { publicClient, serialize } from "./client.js";
 import { CONTRACTS } from "../config.js";
 import { SERVICE_REGISTRY_ABI, NASTAR_ESCROW_ABI as ESCROW_ABI } from "../abis.js";
 import { formatUnits, parseAbiItem } from "viem";
+import { db } from "./supabase.js";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -190,7 +191,7 @@ async function fetchAllDeals(): Promise<IndexedDeal[]> {
   }
 }
 
-function computeStats() {
+async function computeStats() {
   let totalRevenue = 0n;
   let totalCompleted = 0;
   const agentMap = new Map<number, AgentStats>();
@@ -212,7 +213,7 @@ function computeStats() {
     }
   }
 
-  // Aggregate deal data
+  // Aggregate on-chain deal data
   for (const deal of deals) {
     const key = deal.sellerAgentId;
     if (!agentMap.has(key)) {
@@ -241,6 +242,48 @@ function computeStats() {
     if (deal.status === 4) {
       agent.jobsDisputed++;
     }
+  }
+
+  // ── Merge Supabase jobs into stats ──────────────────────────────────────
+  let totalJobsCount = deals.length;
+  try {
+    const { data: jobs } = await db.from("jobs").select("seller_agent_id, phase, amount_usd, buyer_address");
+    if (jobs && jobs.length > 0) {
+      for (const job of jobs) {
+        const key = job.seller_agent_id;
+        if (!agentMap.has(key)) {
+          agentMap.set(key, {
+            agentId: key,
+            name: `Agent #${key}`,
+            address: "",
+            revenue: 0n,
+            revenueFormatted: "0",
+            jobsCompleted: 0,
+            jobsTotal: 0,
+            jobsDisputed: 0,
+            completionRate: 0,
+          });
+        }
+        const agent = agentMap.get(key)!;
+        agent.jobsTotal++;
+        totalJobsCount++;
+
+        if (job.phase === "COMPLETED") {
+          agent.jobsCompleted++;
+          totalCompleted++;
+          const usdAmount = job.amount_usd || 0;
+          // Convert USD to wei-equivalent for revenue tracking
+          const amountWei = BigInt(Math.round(usdAmount * 1e18));
+          agent.revenue += amountWei;
+          totalRevenue += amountWei;
+        }
+        if (job.phase === "REJECTED") {
+          agent.jobsDisputed++;
+        }
+      }
+    }
+  } catch (err) {
+    console.warn("[indexer] Failed to fetch Supabase jobs:", err);
   }
 
   // Compute rates + format
@@ -273,7 +316,7 @@ function computeStats() {
   stats = {
     totalRevenue: formatUnits(totalRevenue, 18),
     totalRevenueRaw: totalRevenue,
-    totalDeals: deals.length,
+    totalDeals: totalJobsCount,
     totalCompletedDeals: totalCompleted,
     totalActiveServices: services.filter(s => s.active).length,
     totalAgents: uniqueAgents.size,
@@ -293,7 +336,7 @@ export async function runIndex() {
 
     services = await fetchAllServices();
     deals = await fetchAllDeals();
-    computeStats();
+    await computeStats();
 
     console.log(`[indexer] Block ${block} | ${services.length} services | ${deals.length} deals | $${stats.totalRevenue} revenue`);
   } catch (err) {

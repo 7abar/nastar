@@ -121,27 +121,45 @@ export default function AgentDetailPage() {
         const leaderboard = lbRes;
         const agentServices = services.filter((s: any) => s.agentId === agentId);
 
+        // Compute real stats from jobs API
+        const allJobs = jobsRes.jobs || [];
+        const completedJobs = allJobs.filter((j: any) => j.phase === "COMPLETED");
+        const realRevenue = completedJobs.reduce((sum: number, j: any) => sum + (j.amount_usd || 0), 0);
+        const realJobsTotal = allJobs.length;
+        const realJobsCompleted = completedJobs.length;
+        const realCompletionRate = realJobsTotal > 0 ? Math.round((realJobsCompleted / realJobsTotal) * 100) : 0;
+
+        // Also check leaderboard for on-chain data (merge both)
+        const lb = leaderboard.find((a: any) => a.agentId === agentId);
+        const totalRevenue = realRevenue + parseFloat(lb?.revenue || "0");
+        const totalJobs = realJobsTotal + (lb?.jobsTotal || 0);
+        const totalCompleted = realJobsCompleted + (lb?.jobsCompleted || 0);
+
         if (agentServices.length > 0) {
-          const lb = leaderboard.find((a: any) => a.agentId === agentId);
           setOnChainAgent({
             agentId,
             name: lb?.name || agentServices[0].name.split("-")[0] || `Agent #${agentId}`,
             description: agentServices[0].description,
             address: agentServices[0].provider,
             services: agentServices,
-            revenue: lb?.revenue || "0",
-            jobsCompleted: lb?.jobsCompleted || 0,
-            jobsTotal: lb?.jobsTotal || 0,
-            completionRate: lb?.completionRate || 0,
+            revenue: totalRevenue > 0 ? totalRevenue.toFixed(2) : "0",
+            jobsCompleted: totalCompleted,
+            jobsTotal: totalJobs,
+            completionRate: totalJobs > 0 ? Math.round((totalCompleted / totalJobs) * 100) : 0,
           });
         }
 
-        // Merge on-chain deals + new jobs system
-        const newJobs = (jobsRes.jobs || []).filter((j: any) => j.phase === "COMPLETED").map((j: any) => ({
+        // Build deals list from all jobs
+        const phaseToLabel: Record<string, string> = {
+          OPEN: "Open", NEGOTIATION: "Negotiation", IN_PROGRESS: "Active",
+          COMPLETED: "Completed", REJECTED: "Rejected", EXPIRED: "Expired",
+        };
+        const newJobs = allJobs.map((j: any) => ({
           dealId: j.deal_id || j.id,
-          buyerAgentId: 0,
+          buyerAgentId: j.buyer_address || "0",
           sellerAgentId: agentId,
-          status: 2, statusLabel: "Completed",
+          status: j.phase === "COMPLETED" ? 2 : j.phase === "IN_PROGRESS" ? 1 : 0,
+          statusLabel: phaseToLabel[j.phase] || j.phase,
           amount: String(Math.round((j.amount_usd || 0) * 1e18)),
           taskDescription: j.requirements?.task || j.offering_name || "",
           createdAt: String(new Date(j.created_at).getTime() / 1000),
@@ -263,33 +281,12 @@ export default function AgentDetailPage() {
                 </div>
               </div>
 
-              {/* Right buttons */}
-              <div className="flex flex-col gap-2 shrink-0">
+              {/* Hire button */}
+              <div className="shrink-0">
                 <a href={`/chat?hire=${id}&name=${encodeURIComponent(storedAgent?.name || onChainAgent.name)}`}
-                  className="px-6 py-2 rounded-full bg-[#F4C430] text-[#0A0A0A] text-sm font-bold hover:shadow-[0_0_15px_rgba(244,196,48,0.3)] transition text-center">
+                  className="px-6 py-2 rounded-full bg-[#F4C430] text-[#0A0A0A] text-sm font-bold hover:shadow-[0_0_15px_rgba(244,196,48,0.3)] transition text-center block">
                   Hire
                 </a>
-                <div className="flex gap-2">
-                  <a href={`https://celoscan.io/address/${agentAddress}`} target="_blank" rel="noopener noreferrer"
-                    className="flex-1 px-4 py-2 rounded-full border border-white/[0.15] text-[#A1A1A1] text-xs hover:text-[#F5F5F5] hover:border-white/[0.3] transition text-center">
-                    CeloScan
-                  </a>
-                  <button
-                    onClick={() => {
-                      const url = `${window.location.origin}/agents/${id}`;
-                      if (navigator.share) {
-                        navigator.share({ title: storedAgent?.name || onChainAgent.name, url });
-                      } else {
-                        navigator.clipboard.writeText(url);
-                        setCopied("share");
-                      }
-                    }}
-                    className="px-4 py-2 rounded-full border border-white/[0.15] text-[#A1A1A1] text-xs hover:text-[#F5F5F5] hover:border-white/[0.3] transition"
-                    title="Share"
-                  >
-                    {copied === "share" ? "Copied!" : "Share"}
-                  </button>
-                </div>
               </div>
             </div>
 
