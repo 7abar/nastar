@@ -445,32 +445,52 @@ function ChatPage() {
 
       // Step 2: User approves escrow to spend cUSD (1 popup)
       addMsg({ role: "system", text: "Approve cUSD for escrow..." });
-      const provider = await wallet.getEthersProvider();
-      const signer = provider.getSigner();
+      const { createWalletClient, custom, parseAbi, http: viemHttp } = await import("viem");
+      const { celo } = await import("viem/chains");
+      const { createPublicClient } = await import("viem");
 
-      const erc20Iface = new (await import("ethers")).Interface([
-        "function approve(address spender, uint256 amount) returns (bool)",
-      ]);
-      const approveData = erc20Iface.encodeFunctionData("approve", [escrowAddr, dealAmount]);
-      const approveTx = await (await signer).sendTransaction({ to: payToken, data: approveData });
-      await approveTx.wait();
+      const ethereumProvider = await wallet.getEthereumProvider();
+      const walletClient = createWalletClient({
+        account: address as `0x${string}`,
+        chain: celo,
+        transport: custom(ethereumProvider),
+      });
+      const publicClient = createPublicClient({ chain: celo, transport: viemHttp("https://forno.celo.org") });
+
+      const ERC20_ABI = parseAbi(["function approve(address,uint256) returns (bool)"]);
+      const approveHash = await walletClient.writeContract({
+        address: payToken as `0x${string}`,
+        abi: ERC20_ABI,
+        functionName: "approve",
+        args: [escrowAddr as `0x${string}`, BigInt(dealAmount)],
+      });
+      await publicClient.waitForTransactionReceipt({ hash: approveHash });
 
       // Step 3: User creates deal on-chain (1 popup)
       addMsg({ role: "system", text: "Creating on-chain escrow deal..." });
-      const escrowIface = new (await import("ethers")).Interface([
-        "function createDeal(uint256 serviceId, uint256 buyerAgentId, uint256 sellerAgentId, address paymentToken, uint256 amount, string taskDescription, uint256 deadline, bool autoConfirm) returns (uint256)",
+      const ESCROW_ABI = parseAbi([
+        "function createDeal(uint256,uint256,uint256,address,uint256,string,uint256,bool) returns (uint256)",
+        "function nextDealId() view returns (uint256)",
       ]);
       const deadline = Math.floor(Date.now() / 1000) + 86400 * 30;
-      const createData = escrowIface.encodeFunctionData("createDeal", [
-        serviceIndex, buyerTokenId, Number(service.agentId),
-        payToken, dealAmount, task, deadline, true,
-      ]);
-      const createTx = await (await signer).sendTransaction({ to: escrowAddr, data: createData });
-      const createReceipt = await createTx.wait();
+      const createHash = await walletClient.writeContract({
+        address: escrowAddr as `0x${string}`,
+        abi: ESCROW_ABI,
+        functionName: "createDeal",
+        args: [
+          BigInt(serviceIndex), BigInt(buyerTokenId), BigInt(Number(service.agentId)),
+          payToken as `0x${string}`, BigInt(dealAmount), task, BigInt(deadline), true,
+        ],
+      });
+      await publicClient.waitForTransactionReceipt({ hash: createHash });
 
-      // Extract dealId from logs (DealCreated event)
-      const dealIdHex = createReceipt?.logs?.[createReceipt.logs.length - 1]?.topics?.[1];
-      const dealId = dealIdHex ? Number(BigInt(dealIdHex)) : -1;
+      // Get dealId
+      const nextId = await publicClient.readContract({
+        address: escrowAddr as `0x${string}`,
+        abi: ESCROW_ABI,
+        functionName: "nextDealId",
+      });
+      const dealId = Number(nextId) - 1;
 
       addMsg({ role: "system", text: `Escrow deal #${dealId} created on-chain! Agent executing...` });
 
