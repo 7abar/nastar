@@ -118,6 +118,21 @@ router.get("/:tokenId/metadata", async (req: Request, res: Response) => {
     const templateId = agentData?.template_id || "custom";
     const avatar = agentData?.avatar;
 
+    // Fetch on-chain stats for this agent from indexer
+    let onChainStats: any = {};
+    try {
+      const { getLeaderboard } = await import("../lib/indexer.js");
+      const lb = getLeaderboard().find((a: any) => a.agentId === tokenIdNum);
+      if (lb) {
+        onChainStats = {
+          jobsCompleted: lb.jobsCompleted || 0,
+          jobsTotal: lb.jobsTotal || 0,
+          completionRate: lb.completionRate || 0,
+          revenue: lb.revenueFormatted || "0",
+        };
+      }
+    } catch {}
+
     // Build full OASF-enriched metadata
     const metadata = buildAgentMetadata({
       name,
@@ -156,6 +171,29 @@ router.get("/:tokenId/metadata", async (req: Request, res: Response) => {
         } as any),
       });
     }
+
+    // Add on-chain performance stats
+    if (onChainStats.jobsTotal > 0) {
+      (metadata as any).performance = {
+        jobsCompleted: onChainStats.jobsCompleted,
+        jobsTotal: onChainStats.jobsTotal,
+        completionRate: `${onChainStats.completionRate}%`,
+        totalRevenue: `${onChainStats.revenue} cUSD`,
+        source: "on-chain escrow contract",
+        contract: CONTRACTS.NASTAR_ESCROW,
+      };
+    }
+
+    // Add protocol-level attributes for Agentscan
+    (metadata as any).attributes = [
+      { trait_type: "Chain", value: "Celo Mainnet" },
+      { trait_type: "Protocol", value: "Nastar" },
+      { trait_type: "Identity Standard", value: "ERC-8004" },
+      { trait_type: "Jobs Completed", value: onChainStats.jobsCompleted || 0, display_type: "number" },
+      { trait_type: "Completion Rate", value: onChainStats.completionRate || 0, display_type: "number" },
+      { trait_type: "Stablecoins Supported", value: 16, display_type: "number" },
+      { trait_type: "Interop", value: "MCP + A2A + OASF" },
+    ];
 
     res.setHeader("Cache-Control", "public, max-age=300");
     res.json(metadata);
