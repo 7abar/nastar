@@ -172,10 +172,21 @@ export default function OfferingsPage() {
         }
       } catch {}
 
+      // Fetch leaderboard for stats (revenue, jobs, success rate)
+      try {
+        const lbRes = await fetch(`${API_URL}/leaderboard`);
+        const lbData = await lbRes.json();
+        if (Array.isArray(lbData)) {
+          setLeaderboard(lbData);
+        }
+      } catch {}
+
       setLoading(false);
     }
     load();
   }, []);
+
+  const [leaderboard, setLeaderboard] = useState<any[]>([]);
 
   useVisibleInterval(() => {
     // Refresh services + agent metadata
@@ -247,6 +258,17 @@ export default function OfferingsPage() {
       description: svc.description,
     });
   }
+  // Merge leaderboard stats into agent map
+  for (const lb of leaderboard) {
+    const id = String(lb.agentId);
+    const agent = agentMap.get(id);
+    if (agent) {
+      agent.jobsCompleted = lb.jobsCompleted || 0;
+      agent.completionRate = lb.completionRate || 0;
+      agent.revenue = lb.revenueFormatted || "0";
+    }
+  }
+
   const agents = Array.from(agentMap.values());
 
   // ── Build all offerings (on-chain + tag-derived) ──────────────────────────
