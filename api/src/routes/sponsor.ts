@@ -633,20 +633,43 @@ router.post("/hire-setup", async (req: Request, res: Response) => {
     });
 
     if (idBalance > 0n) {
-      // Find existing token
-      for (let i = 2600n; i <= 2700n; i++) {
-        try {
-          const owner = await publicClient.readContract({
-            address: CONTRACTS.IDENTITY_REGISTRY as `0x${string}`,
-            abi: IDENTITY_ABI,
-            functionName: "ownerOf",
-            args: [i],
-          });
-          if ((owner as string).toLowerCase() === buyer.toLowerCase()) {
-            buyerTokenId = Number(i);
-            break;
+      // Find existing token via Transfer events (much faster than scanning)
+      try {
+        const latestBlock = await publicClient.getBlockNumber();
+        const fromBlock = latestBlock - 500000n; // ~2 weeks of blocks
+        const transferTopic = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
+        const paddedAddr = ("0x000000000000000000000000" + buyer.slice(2)).toLowerCase();
+        const logs = await publicClient.getLogs({
+          address: CONTRACTS.IDENTITY_REGISTRY as `0x${string}`,
+          fromBlock: fromBlock > 0n ? fromBlock : 0n,
+          toBlock: "latest",
+          topics: [transferTopic, null, paddedAddr as `0x${string}`],
+        });
+        if (logs.length > 0) {
+          const lastLog = logs[logs.length - 1];
+          if (lastLog.topics[3]) {
+            buyerTokenId = Number(BigInt(lastLog.topics[3]));
           }
-        } catch { continue; }
+        }
+      } catch (e) {
+        console.error("[hire-setup] Token scan via logs failed:", (e as Error).message?.slice(0, 100));
+      }
+      // Fallback: brute scan from recent range
+      if (buyerTokenId === 0) {
+        for (let i = 1850n; i <= 2700n; i++) {
+          try {
+            const owner = await publicClient.readContract({
+              address: CONTRACTS.IDENTITY_REGISTRY as `0x${string}`,
+              abi: IDENTITY_ABI,
+              functionName: "ownerOf",
+              args: [i],
+            });
+            if ((owner as string).toLowerCase() === buyer.toLowerCase()) {
+              buyerTokenId = Number(i);
+              break;
+            }
+          } catch { continue; }
+        }
       }
     }
 
