@@ -122,8 +122,15 @@ export default function AgentDetailPage() {
         const leaderboard = lbRes;
         const agentServices = services.filter((s: any) => s.agentId === agentId);
 
-        // Stats from on-chain leaderboard (real escrow data only)
+        // Stats: merge on-chain leaderboard + Supabase jobs
         const lb = leaderboard.find((a: any) => a.agentId === agentId);
+        const jobsList = jobsRes?.jobs || [];
+        const sbCompleted = jobsList.filter((j: any) => j.phase === "COMPLETED").length;
+        const sbTotal = jobsList.length;
+        const totalCompleted = (lb?.jobsCompleted || 0) + sbCompleted;
+        const totalJobs = (lb?.jobsTotal || 0) + sbTotal;
+        const completionRate = totalJobs > 0 ? Math.round((totalCompleted / totalJobs) * 100) : 0;
+        const totalRevenue = parseFloat(lb?.revenue || "0") + jobsList.reduce((sum: number, j: any) => j.phase === "COMPLETED" ? sum + (j.amount_usd || 0) : sum, 0);
 
         if (agentServices.length > 0) {
           setOnChainAgent({
@@ -132,10 +139,10 @@ export default function AgentDetailPage() {
             description: agentServices[0].description,
             address: agentServices[0].provider,
             services: agentServices,
-            revenue: lb?.revenue || "0",
-            jobsCompleted: lb?.jobsCompleted || 0,
-            jobsTotal: lb?.jobsTotal || 0,
-            completionRate: lb?.completionRate || 0,
+            revenue: totalRevenue.toFixed(2),
+            jobsCompleted: totalCompleted,
+            jobsTotal: totalJobs,
+            completionRate,
           });
         }
 
@@ -143,8 +150,7 @@ export default function AgentDetailPage() {
         const validDeals = Array.isArray(dealsRes) ? dealsRes : [];
         if (validDeals.length > 0) setDeals(validDeals);
 
-        // Jobs from Supabase (butler chat flow)
-        const jobsList = jobsRes?.jobs || [];
+        // Store jobs for display
         if (jobsList.length > 0) setJobs(jobsList);
         if (repRes) setReputation(repRes);
         if (metaRes) setMetadata(metaRes);
