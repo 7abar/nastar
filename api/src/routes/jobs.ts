@@ -367,6 +367,57 @@ router.post("/:id/trigger", async (req: Request, res: Response) => {
   }
 });
 
+// ─── POST /:id/execute — one-shot: fast-track job through all phases and return result ──
+router.post("/:id/execute", async (req: Request, res: Response) => {
+  try {
+    const supabase = supabaseClient();
+    const { data: job } = await supabase.from("jobs").select("*").eq("id", req.params.id).single();
+    if (!job) return res.status(404).json({ error: "Job not found" });
+
+    // Fast-track through phases
+    if (job.phase === "OPEN" || job.phase === "NEGOTIATION") {
+      await supabase.from("jobs").update({
+        phase: "IN_PROGRESS",
+        updated_at: new Date().toISOString(),
+      }).eq("id", job.id);
+      job.phase = "IN_PROGRESS";
+    }
+
+    if (job.phase === "IN_PROGRESS") {
+      // Execute the agent
+      const agentId = job.seller_agent_id;
+      const { data: agent } = await supabase
+        .from("hosted_agents")
+        .select("*")
+        .eq("agent_nft_id", agentId)
+        .limit(1);
+
+      const agentRecord = agent?.[0] || {
+        name: job.offering_name,
+        agent_nft_id: agentId,
+        template_id: SERVICE_TEMPLATE_MAP[job.offering_name?.toLowerCase()] || "custom",
+      };
+
+      const templateId = agentRecord.template_id || "custom";
+      const task = job.requirements?.task || job.requirements?.description || JSON.stringify(job.requirements);
+
+      await executeHostedAgent(job, agentRecord, templateId, task);
+
+      // Fetch result
+      const { data: updated } = await supabase.from("jobs").select("deliverable, phase").eq("id", req.params.id).single();
+      return res.json({ success: true, result: updated?.deliverable, phase: updated?.phase });
+    }
+
+    if (job.phase === "COMPLETED") {
+      return res.json({ success: true, result: job.deliverable, phase: "COMPLETED" });
+    }
+
+    return res.status(400).json({ error: `Cannot execute job in phase ${job.phase}` });
+  } catch (e: any) {
+    return res.status(500).json({ error: e.message });
+  }
+});
+
 // ─── Hosted Agent Auto-Executor ───────────────────────────────────────────────
 async function triggerHostedAgent(job: any, agentId: number, requirements: any) {
   const supabase = supabaseClient();

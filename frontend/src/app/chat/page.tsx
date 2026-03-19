@@ -69,7 +69,16 @@ function ChatPage() {
 
   const [showHistory, setShowHistory] = useState(false);
   const [chatSessions, setChatSessions] = useState<{ id: string; title: string; date: number }[]>([]);
-  const [currentSessionId, setCurrentSessionId] = useState<string>(() => `chat-${Date.now()}`);
+  const [currentSessionId, setCurrentSessionId] = useState<string>(() => {
+    // Restore last session on mount
+    if (typeof window !== "undefined") {
+      try {
+        const sessions = JSON.parse(localStorage.getItem("nastar-chat-sessions") || "[]");
+        if (sessions.length > 0) return sessions[0].id;
+      } catch {}
+    }
+    return `chat-${Date.now()}`;
+  });
   const [selectedPayToken, setSelectedPayToken] = useState(CELO_TOKENS.USDm); // default cUSD
   const PAY_TOKENS = [
     { symbol: "cUSD", address: CELO_TOKENS.USDm, decimals: 18, logo: "/tokens/cusd.svg" },
@@ -81,13 +90,26 @@ function ChatPage() {
   const inputRef = useRef<HTMLInputElement>(null);
   const searchParams = useSearchParams();
 
-  // ── Chat History (localStorage) ──
+  // ── Chat History (localStorage) — restore on mount ──
   useEffect(() => {
     try {
       const stored = localStorage.getItem("nastar-chat-sessions");
-      if (stored) setChatSessions(JSON.parse(stored));
+      if (stored) {
+        const sessions = JSON.parse(stored);
+        setChatSessions(sessions);
+        // Restore messages from current session
+        if (currentSessionId) {
+          const data = localStorage.getItem(`nastar-chat-${currentSessionId}`);
+          if (data) {
+            const restored = JSON.parse(data);
+            if (Array.isArray(restored) && restored.length > 0) {
+              setMessages(restored);
+            }
+          }
+        }
+      }
     } catch {}
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Save messages to current session whenever they change
   useEffect(() => {
@@ -397,46 +419,18 @@ function ChatPage() {
     }
 
     const amount = service.pricePerCall;
-    const amountNum = parseFloat(amount);
     const payToken = PAY_TOKENS.find(t => t.address.toLowerCase() === selectedPayToken.toLowerCase()) || PAY_TOKENS[0];
     addMsg({ role: "user", text: `Hire ${service.name} for ${amount} ${payToken.symbol}` });
     setLoading(true);
 
     try {
       const address = wallets[0].address;
-      const API = process.env.NEXT_PUBLIC_API_URL || "https://api.nastar.fun";
-
-      // Step 1: Ensure user has a Nastar Wallet
-      addMsg({ role: "system", text: "Setting up your Nastar Wallet..." });
-      const createRes = await fetch(`${API}/v1/wallet/create`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ownerAddress: address }),
-      });
-      const walletData = await createRes.json();
-      if (!walletData.success) throw new Error(walletData.error || "Wallet creation failed");
-
-      const nastarWallet = walletData.walletAddress;
-
-      // Step 2: Check balance
-      const balRes = await fetch(`${API}/v1/wallet/balance?ownerAddress=${address}`);
-      const balData = await balRes.json();
-      const available = parseFloat(balData.balances?.cUSD || "0") + parseFloat(balData.balances?.USDC || "0") + parseFloat(balData.balances?.USDT || "0");
-      const needed = amountNum;
-
-      if (available < needed) {
-        addMsg({
-          role: "assistant",
-          text: `Insufficient balance in your Nastar Wallet. You need ${needed} but have ${available.toFixed(2)}.\n\nDeposit stablecoins (cUSD, USDC, USDT) to:\n\`${nastarWallet}\`\n\nThen try hiring again.`,
-        });
-        setLoading(false);
-        return;
-      }
-
-      // Step 3: Create ACP-style job (OPEN → NEGOTIATION → IN_PROGRESS auto)
-      addMsg({ role: "system", text: "Creating job order..." });
       const task = input.trim() || `Execute ${service.name}`;
-      const jobRes = await fetch(`${API}/v1/jobs`, {
+
+      // Step 1: Create job + execute via server-sponsored flow
+      addMsg({ role: "system", text: "Creating job and executing agent..." });
+
+      const jobRes = await fetch(`${API_URL}/v1/jobs`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -450,18 +444,34 @@ function ChatPage() {
         }),
       });
       const jobData = await jobRes.json();
-
-      if (!jobRes.ok) {
-        throw new Error(jobData.error || "Job creation failed");
-      }
+      if (!jobRes.ok) throw new Error(jobData.error || "Job creation failed");
 
       const jobId = jobData.jobId;
 
-      addMsg({
-        role: "assistant",
-        text: `Job created (${jobId.slice(0, 8)}...).\n\n**${service.name}** — Agent #${service.agentId} is reviewing your request. Once they confirm, you'll approve payment and the job begins.\n\nView agent profile to track progress.`,
-        agentLink: { id: String(service.agentId), name: service.name, dealId: jobId },
+      // Step 2: If the agent is hosted, execute the task immediately
+      addMsg({ role: "system", text: "Agent is processing your request..." });
+
+      const execRes = await fetch(`${API_URL}/v1/jobs/${jobId}/execute`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
       });
+
+      if (execRes.ok) {
+        const execData = await execRes.json();
+        const result = execData.result || "Task completed successfully.";
+        addMsg({
+          role: "assistant",
+          text: `**${service.name}** completed your task:\n\n${result}`,
+          agentLink: { id: String(service.agentId), name: service.name, dealId: jobId },
+        });
+      } else {
+        // Execution not available — show job created
+        addMsg({
+          role: "assistant",
+          text: `Job created (${jobId.slice(0, 8)}...).\n\n**${service.name}** — Agent #${service.agentId} is processing your request.\n\nView agent profile to track progress.`,
+          agentLink: { id: String(service.agentId), name: service.name, dealId: jobId },
+        });
+      }
     } catch (err: unknown) {
       addMsg({ role: "assistant", text: `Error: ${err instanceof Error ? err.message.slice(0, 120) : String(err)}` });
     }
