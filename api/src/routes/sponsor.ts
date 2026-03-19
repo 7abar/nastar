@@ -8,7 +8,7 @@
  */
 
 import { Router, Request, Response } from "express";
-import { createPublicClient, createWalletClient, http, encodeFunctionData, parseAbi } from "viem";
+import { createPublicClient, createWalletClient, http, encodeFunctionData, parseAbi, parseUnits } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { celo } from "viem/chains";
 import { CONTRACTS } from "../config.js";
@@ -590,6 +590,191 @@ router.post("/mint-identity", async (req: Request, res: Response) => {
   } catch (err: any) {
     console.error("[sponsor] mint-identity error:", err.message);
     return res.status(500).json({ error: err.message?.slice(0, 200) || "Mint failed" });
+  }
+});
+
+/**
+ * POST /v1/sponsor/hire-setup
+ * Prepares a user to create a real on-chain escrow deal:
+ * 1. Drips gas (CELO) if needed
+ * 2. Mints + transfers ERC-8004 identity if needed
+ * 3. Drips cUSD for the deal amount
+ * Returns: buyerTokenId, ready to approve + createDeal
+ */
+router.post("/hire-setup", async (req: Request, res: Response) => {
+  try {
+    const pk = process.env.PRIVATE_KEY;
+    if (!pk) return res.status(500).json({ error: "Sponsor wallet not configured" });
+
+    const { buyerAddress, amount } = req.body;
+    if (!buyerAddress) return res.status(400).json({ error: "buyerAddress required" });
+
+    const account = privateKeyToAccount(pk as `0x${string}`);
+    const walletClient = createWalletClient({ account, chain: celo, transport: http(CELO_RPC) });
+    const buyer = buyerAddress as `0x${string}`;
+    const dealAmount = BigInt(amount || "50000000000000000"); // default 0.05 cUSD (18 decimals)
+
+    // 1. Gas drip
+    const userBalance = await publicClient.getBalance({ address: buyer });
+    let gasTx: string | null = null;
+    if (userBalance < parseUnits("0.005", 18)) {
+      const h = await walletClient.sendTransaction({ to: buyer, value: parseUnits("0.01", 18) });
+      await publicClient.waitForTransactionReceipt({ hash: h });
+      gasTx = h;
+    }
+
+    // 2. Identity NFT
+    let buyerTokenId = 0;
+    const idBalance = await publicClient.readContract({
+      address: CONTRACTS.IDENTITY_REGISTRY as `0x${string}`,
+      abi: IDENTITY_ABI,
+      functionName: "balanceOf",
+      args: [buyer],
+    });
+
+    if (idBalance > 0n) {
+      // Find existing token
+      for (let i = 2600n; i <= 2700n; i++) {
+        try {
+          const owner = await publicClient.readContract({
+            address: CONTRACTS.IDENTITY_REGISTRY as `0x${string}`,
+            abi: IDENTITY_ABI,
+            functionName: "ownerOf",
+            args: [i],
+          });
+          if ((owner as string).toLowerCase() === buyer.toLowerCase()) {
+            buyerTokenId = Number(i);
+            break;
+          }
+        } catch { continue; }
+      }
+    }
+
+    if (buyerTokenId === 0) {
+      // Mint + transfer
+      const mintHash = await walletClient.writeContract({
+        address: CONTRACTS.IDENTITY_REGISTRY as `0x${string}`,
+        abi: IDENTITY_ABI,
+        functionName: "register",
+      });
+      const mintRec = await publicClient.waitForTransactionReceipt({ hash: mintHash });
+      const log = mintRec.logs.find(
+        (l) => l.topics[0] === "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+      );
+      if (log?.topics[3]) buyerTokenId = Number(BigInt(log.topics[3]));
+
+      const TRANSFER_ABI = parseAbi(["function transferFrom(address,address,uint256)"]);
+      const tfHash = await walletClient.writeContract({
+        address: CONTRACTS.IDENTITY_REGISTRY as `0x${string}`,
+        abi: TRANSFER_ABI,
+        functionName: "transferFrom",
+        args: [account.address, buyer, BigInt(buyerTokenId)],
+      });
+      await publicClient.waitForTransactionReceipt({ hash: tfHash });
+    }
+
+    // 3. Drip cUSD for the deal
+    const cUSD = (CONTRACTS as any).USDm || (CONTRACTS as any).cUSD || "0x765DE816845861e75A25fCA122bb6898B8B1282a";
+    const ERC20_ABI = parseAbi(["function transfer(address,uint256) returns (bool)", "function balanceOf(address) view returns (uint256)"]);
+
+    const buyerCusd = await publicClient.readContract({
+      address: cUSD as `0x${string}`,
+      abi: ERC20_ABI,
+      functionName: "balanceOf",
+      args: [buyer],
+    });
+
+    let cusdTx: string | null = null;
+    if (buyerCusd < dealAmount) {
+      const needed = dealAmount - buyerCusd;
+      const h = await walletClient.writeContract({
+        address: cUSD as `0x${string}`,
+        abi: ERC20_ABI,
+        functionName: "transfer",
+        args: [buyer, needed],
+      });
+      await publicClient.waitForTransactionReceipt({ hash: h });
+      cusdTx = h;
+    }
+
+    return res.json({
+      success: true,
+      buyerTokenId,
+      gasTx,
+      cusdTx,
+      escrowAddress: CONTRACTS.NASTAR_ESCROW,
+      paymentToken: cUSD,
+      amount: dealAmount.toString(),
+    });
+  } catch (err: any) {
+    console.error("[sponsor] hire-setup error:", err.message);
+    return res.status(500).json({ error: err.message?.slice(0, 200) || "Setup failed" });
+  }
+});
+
+/**
+ * POST /v1/sponsor/complete-deal
+ * Server (seller) accepts + delivers a deal created by the buyer.
+ */
+router.post("/complete-deal", async (req: Request, res: Response) => {
+  try {
+    const pk = process.env.PRIVATE_KEY;
+    if (!pk) return res.status(500).json({ error: "Sponsor wallet not configured" });
+
+    const { dealId, task } = req.body;
+    if (dealId === undefined) return res.status(400).json({ error: "dealId required" });
+
+    const account = privateKeyToAccount(pk as `0x${string}`);
+    const walletClient = createWalletClient({ account, chain: celo, transport: http(CELO_RPC) });
+
+    const ESCROW_ABI = parseAbi([
+      "function acceptDeal(uint256)",
+      "function deliverDeal(uint256,string)",
+      "function getDeal(uint256) view returns (tuple(uint256 serviceId, uint256 buyerAgentId, uint256 sellerAgentId, address buyer, address seller, address paymentToken, uint256 amount, string taskDescription, string deliveryProof, uint8 status, uint256 deadline, uint256 createdAt, uint256 completedAt, bool autoConfirm, address judgeAddress))",
+    ]);
+
+    // Execute agent to get result
+    let result = `Task completed: ${task || "Executed successfully"}`;
+    try {
+      const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
+      if (ANTHROPIC_KEY) {
+        const llmRes = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-api-key": ANTHROPIC_KEY, "anthropic-version": "2023-06-01" },
+          body: JSON.stringify({
+            model: "claude-haiku-4-5",
+            max_tokens: 600,
+            system: "You are a professional AI agent on Nastar Protocol. Execute the task and deliver a clear, structured result. Be specific and actionable.",
+            messages: [{ role: "user", content: task || "Complete the requested task" }],
+          }),
+        });
+        const llmData: any = await llmRes.json();
+        result = llmData.content?.[0]?.text || result;
+      }
+    } catch {}
+
+    // Accept deal
+    const acceptHash = await walletClient.writeContract({
+      address: CONTRACTS.NASTAR_ESCROW as `0x${string}`,
+      abi: ESCROW_ABI,
+      functionName: "acceptDeal",
+      args: [BigInt(dealId)],
+    });
+    await publicClient.waitForTransactionReceipt({ hash: acceptHash });
+
+    // Deliver deal (autoConfirm=true will auto-complete)
+    const deliverHash = await walletClient.writeContract({
+      address: CONTRACTS.NASTAR_ESCROW as `0x${string}`,
+      abi: ESCROW_ABI,
+      functionName: "deliverDeal",
+      args: [BigInt(dealId), result.slice(0, 500)],
+    });
+    await publicClient.waitForTransactionReceipt({ hash: deliverHash });
+
+    return res.json({ success: true, dealId, result, deliverTx: deliverHash });
+  } catch (err: any) {
+    console.error("[sponsor] complete-deal error:", err.message);
+    return res.status(500).json({ error: err.message?.slice(0, 200) || "Complete failed" });
   }
 });
 

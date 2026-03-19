@@ -418,62 +418,86 @@ function ChatPage() {
       return;
     }
 
-    const amount = service.pricePerCall;
-    const payToken = PAY_TOKENS.find(t => t.address.toLowerCase() === selectedPayToken.toLowerCase()) || PAY_TOKENS[0];
-    addMsg({ role: "user", text: `Hire ${service.name} (sponsored)` });
+    const priceRaw = service.pricePerCall;
+    const priceNum = parseFloat(priceRaw);
+    addMsg({ role: "user", text: `Hire ${service.name} for ${priceRaw} cUSD` });
     setLoading(true);
 
     try {
-      const address = wallets[0].address;
+      const wallet = wallets[0];
+      const address = wallet.address;
       const task = input.trim() || `Execute ${service.name}`;
+      const dealAmount = BigInt(Math.floor(priceNum * 1e18)).toString();
 
-      // Step 1: Create job + execute via server-sponsored flow
-      addMsg({ role: "system", text: "Creating sponsored job..." });
-
-      const jobRes = await fetch(`${API_URL}/v1/jobs`, {
+      // Step 1: Server sponsors setup (gas + identity NFT + cUSD drip)
+      addMsg({ role: "system", text: "Preparing escrow deal..." });
+      const setupRes = await fetch(`${API_URL}/v1/sponsor/hire-setup`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          buyerAddress: address,
-          sellerAgentId: Number(service.agentId),
-          offeringName: service.name,
-          serviceId: serviceIndex,
-          requirements: { task, serviceDescription: service.description },
-          paymentToken: selectedPayToken,
-          amount: amount.toString(),
-        }),
+        body: JSON.stringify({ buyerAddress: address, amount: dealAmount }),
       });
-      const jobData = await jobRes.json();
-      if (!jobRes.ok) throw new Error(jobData.error || "Job creation failed");
+      const setup = await setupRes.json();
+      if (!setup.success) throw new Error(setup.error || "Setup failed");
 
-      const jobId = jobData.jobId;
+      const buyerTokenId = setup.buyerTokenId;
+      const escrowAddr = setup.escrowAddress;
+      const payToken = setup.paymentToken;
 
-      // Step 2: If the agent is hosted, execute the task immediately
-      addMsg({ role: "system", text: "Agent is processing your request..." });
+      // Step 2: User approves escrow to spend cUSD (1 popup)
+      addMsg({ role: "system", text: "Approve cUSD for escrow..." });
+      const provider = await wallet.getEthersProvider();
+      const signer = provider.getSigner();
 
-      const execRes = await fetch(`${API_URL}/v1/jobs/${jobId}/execute`, {
+      const erc20Iface = new (await import("ethers")).Interface([
+        "function approve(address spender, uint256 amount) returns (bool)",
+      ]);
+      const approveData = erc20Iface.encodeFunctionData("approve", [escrowAddr, dealAmount]);
+      const approveTx = await (await signer).sendTransaction({ to: payToken, data: approveData });
+      await approveTx.wait();
+
+      // Step 3: User creates deal on-chain (1 popup)
+      addMsg({ role: "system", text: "Creating on-chain escrow deal..." });
+      const escrowIface = new (await import("ethers")).Interface([
+        "function createDeal(uint256 serviceId, uint256 buyerAgentId, uint256 sellerAgentId, address paymentToken, uint256 amount, string taskDescription, uint256 deadline, bool autoConfirm) returns (uint256)",
+      ]);
+      const deadline = Math.floor(Date.now() / 1000) + 86400 * 30;
+      const createData = escrowIface.encodeFunctionData("createDeal", [
+        serviceIndex, buyerTokenId, Number(service.agentId),
+        payToken, dealAmount, task, deadline, true,
+      ]);
+      const createTx = await (await signer).sendTransaction({ to: escrowAddr, data: createData });
+      const createReceipt = await createTx.wait();
+
+      // Extract dealId from logs (DealCreated event)
+      const dealIdHex = createReceipt?.logs?.[createReceipt.logs.length - 1]?.topics?.[1];
+      const dealId = dealIdHex ? Number(BigInt(dealIdHex)) : -1;
+
+      addMsg({ role: "system", text: `Escrow deal #${dealId} created on-chain! Agent executing...` });
+
+      // Step 4: Server accepts + delivers (agent executes task)
+      const completeRes = await fetch(`${API_URL}/v1/sponsor/complete-deal`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dealId, task }),
       });
+      const completeData = await completeRes.json();
 
-      if (execRes.ok) {
-        const execData = await execRes.json();
-        const result = execData.result || "Task completed successfully.";
+      if (completeData.success) {
         addMsg({
           role: "assistant",
-          text: `**${service.name}** completed your task:\n\n${result}`,
-          agentLink: { id: String(service.agentId), name: service.name, dealId: jobId },
+          text: `**${service.name}** completed your task (Deal #${dealId}):\n\n${completeData.result}\n\n[View on CeloScan](https://celoscan.io/tx/${completeData.deliverTx})`,
+          agentLink: { id: String(service.agentId), name: service.name, dealId: String(dealId) },
         });
       } else {
-        // Execution not available — show job created
-        addMsg({
-          role: "assistant",
-          text: `Job created (${jobId.slice(0, 8)}...).\n\n**${service.name}** — Agent #${service.agentId} is processing your request.\n\nView agent profile to track progress.`,
-          agentLink: { id: String(service.agentId), name: service.name, dealId: jobId },
-        });
+        addMsg({ role: "assistant", text: `Deal #${dealId} created but execution failed: ${completeData.error}` });
       }
     } catch (err: unknown) {
-      addMsg({ role: "assistant", text: `Error: ${err instanceof Error ? err.message.slice(0, 120) : String(err)}` });
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes("rejected") || msg.includes("denied")) {
+        addMsg({ role: "assistant", text: "Transaction cancelled by user." });
+      } else {
+        addMsg({ role: "assistant", text: `Error: ${msg.slice(0, 150)}` });
+      }
     }
 
     setLoading(false);
@@ -642,16 +666,12 @@ function ChatPage() {
                             <span className="text-[#F4C430] text-xs font-medium">{svc.pricePerCall} USD</span>
                           </div>
                           <p className="text-[#A1A1A1] text-xs mb-2 line-clamp-2">{svc.description}</p>
-                          {/* Price info */}
-                          <p className="text-[10px] text-[#A1A1A1]/60 mb-2">
-                            Regular price: {svc.pricePerCall} cUSD — <span className="text-green-400">Free during launch</span>
-                          </p>
                           <button
                             onClick={() => handleHire(svc, i)}
                             disabled={loading}
                             className="w-full py-1.5 rounded-lg bg-[#F4C430] text-[#0A0A0A] text-xs font-bold hover:shadow-[0_0_15px_rgba(244,196,48,0.3)] disabled:opacity-50 transition"
                           >
-                            Hire {svc.name} — Free (Sponsored)
+                            Hire — {svc.pricePerCall} cUSD (gas sponsored)
                           </button>
                         </div>
                       );
