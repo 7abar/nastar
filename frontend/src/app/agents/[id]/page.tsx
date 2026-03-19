@@ -281,7 +281,7 @@ export default function AgentDetailPage() {
                     </div>
                     <div className="flex items-center gap-3 shrink-0 ml-4">
                       <span className="text-[#F4C430] text-sm font-semibold">
-                        {(() => { try { const v = Number(BigInt(svc.pricePerCall)) / 1e18; return v < 0.01 ? v.toFixed(4) : v.toFixed(2); } catch { return svc.pricePerCall; } })() } cUSD
+                        {(() => { try { const v = parseFloat(svc.pricePerCall); return v < 0.01 ? v.toFixed(4) : v.toFixed(2); } catch { return svc.pricePerCall; } })() } cUSD
                       </span>
                       <span className={`w-2 h-2 rounded-full ${svc.active ? "bg-green-400" : "bg-[#A1A1A1]/30"}`} title={svc.active ? "Active" : "Inactive"} />
                     </div>

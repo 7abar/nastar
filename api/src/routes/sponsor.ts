@@ -324,8 +324,9 @@ router.post("/mint-and-transfer", async (req: Request, res: Response) => {
         agentNftId = Number(BigInt(transferLog.topics[3]));
       }
     } else {
-      // Already has NFT — find it
-      for (let i = 0n; i <= 2000n; i++) {
+      // Already has NFT — find it by scanning recent tokens
+      // Get current total supply hint from nextServiceId or scan up to latest mint
+      for (let i = 0n; i <= 5000n; i++) {
         try {
           const owner = await publicClient.readContract({
             address: CONTRACTS.IDENTITY_REGISTRY as `0x${string}`,
@@ -338,6 +339,24 @@ router.post("/mint-and-transfer", async (req: Request, res: Response) => {
             break;
           }
         } catch { continue; }
+      }
+    }
+
+    if (agentNftId === null) {
+      // User has balance but we couldn't find their token — mint a new one
+      const mintHash = await walletClient.writeContract({
+        address: CONTRACTS.IDENTITY_REGISTRY as `0x${string}`,
+        abi: IDENTITY_ABI,
+        functionName: "register",
+      });
+      const receipt = await publicClient.waitForTransactionReceipt({ hash: mintHash });
+      txHashes.push(mintHash);
+
+      const transferLog = receipt.logs.find(
+        (l) => l.topics[0] === "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+      );
+      if (transferLog?.topics[3]) {
+        agentNftId = Number(BigInt(transferLog.topics[3]));
       }
     }
 
@@ -520,7 +539,7 @@ router.post("/mint-identity", async (req: Request, res: Response) => {
 
     if (balance > 0n) {
       // Find existing token ID
-      for (let i = 0n; i <= 2000n; i++) {
+      for (let i = 0n; i <= 5000n; i++) {
         try {
           const owner = await publicClient.readContract({
             address: CONTRACTS.IDENTITY_REGISTRY as `0x${string}`,

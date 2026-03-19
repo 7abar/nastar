@@ -21,7 +21,7 @@ interface Service {
   description: string;
   endpoint: string;
   paymentToken: string;
-  pricePerCall: bigint;
+  pricePerCall: string;
   active: boolean;
   createdAt: bigint;
   updatedAt?: bigint;
@@ -183,7 +183,7 @@ function ChatPage() {
         const mapped: Service[] = list.map((s: any) => ({
           ...s,
           agentId: BigInt(s.agentId),
-          pricePerCall: BigInt(s.pricePerCall),
+          pricePerCall: String(s.pricePerCall),
           createdAt: BigInt(s.createdAt || 0),
         }));
         setServices(mapped);
@@ -219,8 +219,7 @@ function ChatPage() {
         const agentServices = services.filter((s) => String(s.agentId) === String(agentId));
         if (agentServices.length > 0) {
           const serviceList = agentServices.map((s) => {
-            const price = formatUnits(s.pricePerCall, 18);
-            return `- **${s.name}** — ${s.description || "Service"}\n  Price: **${price} USD**`;
+            return `- **${s.name}** — ${s.description || "Service"}\n  Price: **${s.pricePerCall} USD**`;
           }).join("\n");
           addMsg({
             role: "assistant",
@@ -244,8 +243,7 @@ function ChatPage() {
 
       if (agentServices.length > 0) {
         const serviceList = agentServices.map((s) => {
-          const price = formatUnits(s.pricePerCall, 18);
-          return `- **${s.name}** — ${s.description || "Service"}\n  Price: **${price} USD**`;
+          return `- **${s.name}** — ${s.description || "Service"}\n  Price: **${s.pricePerCall} USD**`;
         }).join("\n");
 
         addMsg({
@@ -296,7 +294,7 @@ function ChatPage() {
       chatHistory.push({ role: "user", content: userText });
 
       const servicesContext = services.length > 0
-        ? services.map((s, i) => `#${i}: "${s.name}" (Agent ${s.agentId}) — ${s.description}. ${formatUnits(s.pricePerCall, 18)} USDC`).join("\n")
+        ? services.map((s, i) => `#${i}: "${s.name}" (Agent ${s.agentId}) — ${s.description}. ${s.pricePerCall} USDC`).join("\n")
         : "No agents registered yet.";
 
       const wallet = wallets?.[0]?.address || "anonymous";
@@ -630,7 +628,7 @@ function ChatPage() {
                         <div key={i} className="p-3 rounded-xl bg-[#0A0A0A]/50 border border-[#F4C430]/20">
                           <div className="flex items-center justify-between mb-1">
                             <span className="font-semibold text-[#F5F5F5] text-sm">{svc.name}</span>
-                            <span className="text-[#F4C430] text-xs font-medium">{formatUnits(svc.pricePerCall, 18)} USD</span>
+                            <span className="text-[#F4C430] text-xs font-medium">{svc.pricePerCall} USD</span>
                           </div>
                           <p className="text-[#A1A1A1] text-xs mb-2 line-clamp-2">{svc.description}</p>
                           {/* Token selector */}
@@ -655,7 +653,7 @@ function ChatPage() {
                             disabled={loading}
                             className="w-full py-1.5 rounded-lg bg-[#F4C430] text-[#0A0A0A] text-xs font-bold hover:shadow-[0_0_15px_rgba(244,196,48,0.3)] disabled:opacity-50 transition"
                           >
-                            Hire — {formatUnits(svc.pricePerCall, 18)} {selToken.symbol}
+                            Hire — {svc.pricePerCall} {selToken.symbol}
                           </button>
                         </div>
                       );
