@@ -172,13 +172,11 @@ export default function OfferingsPage() {
         }
       } catch {}
 
-      // Fetch leaderboard for stats (revenue, jobs, success rate)
+      // Fetch on-chain leaderboard
       try {
         const lbRes = await fetch(`${API_URL}/leaderboard`);
         const lbData = await lbRes.json();
-        if (Array.isArray(lbData)) {
-          setLeaderboard(lbData);
-        }
+        if (Array.isArray(lbData)) setLeaderboard(lbData);
       } catch {}
 
       setLoading(false);
@@ -258,10 +256,9 @@ export default function OfferingsPage() {
       description: svc.description,
     });
   }
-  // Merge leaderboard stats into agent map
+  // Merge on-chain leaderboard stats
   for (const lb of leaderboard) {
-    const id = String(lb.agentId);
-    const agent = agentMap.get(id);
+    const agent = agentMap.get(String(lb.agentId));
     if (agent) {
       agent.jobsCompleted = lb.jobsCompleted || 0;
       agent.completionRate = lb.completionRate || 0;

@@ -71,6 +71,9 @@ const ERC20_ABI = parseAbi([
 
 const ESCROW_ABI = parseAbi([
   "function createDeal(uint256 serviceId, uint256 buyerAgentId, uint256 sellerAgentId, address paymentToken, uint256 amount, string description, uint256 deadline, bool autoConfirm) returns (uint256)",
+  "function confirmDelivery(uint256 dealId, string deliveryProof) external",
+  "function nextDealId() view returns (uint256)",
+  "event DealCreated(uint256 indexed dealId, uint256 indexed serviceId, address indexed buyer)",
 ]);
 
 // Known stablecoins on Celo
@@ -334,11 +337,41 @@ router.post("/hire", async (req: Request, res: Response) => {
         true, // autoConfirm
       ],
     });
-    await publicClient.waitForTransactionReceipt({ hash: dealHash });
+    const dealReceipt = await publicClient.waitForTransactionReceipt({ hash: dealHash });
     txHashes.push(dealHash);
+
+    // Extract dealId from DealCreated event log
+    // DealCreated(uint256 indexed dealId, ...)
+    // topic[0] = event sig, topic[1] = dealId (indexed)
+    const DEAL_CREATED_SIG = "0x" + Buffer.from(
+      require("crypto").createHash("keccak256")
+        .update("DealCreated(uint256,uint256,address)")
+        .digest("hex"),
+      "hex"
+    ).toString("hex");
+
+    let dealId: number | null = null;
+    for (const log of dealReceipt.logs) {
+      if (log.topics[0]?.toLowerCase() === DEAL_CREATED_SIG.toLowerCase() && log.topics[1]) {
+        dealId = Number(BigInt(log.topics[1]));
+        break;
+      }
+    }
+    // Fallback: use nextDealId - 1
+    if (dealId === null) {
+      try {
+        const next = await publicClient.readContract({
+          address: CONTRACTS.NASTAR_ESCROW as `0x${string}`,
+          abi: ESCROW_ABI,
+          functionName: "nextDealId",
+        });
+        dealId = Number(next as bigint) - 1;
+      } catch {}
+    }
 
     return res.json({
       success: true,
+      dealId,
       dealTxHash: dealHash,
       txHashes,
       gasSponsored: true,

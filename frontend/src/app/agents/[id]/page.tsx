@@ -122,15 +122,9 @@ export default function AgentDetailPage() {
         const leaderboard = lbRes;
         const agentServices = services.filter((s: any) => s.agentId === agentId);
 
-        // Stats: merge on-chain leaderboard + Supabase jobs
+        // Stats from on-chain leaderboard only
         const lb = leaderboard.find((a: any) => a.agentId === agentId);
         const jobsList = jobsRes?.jobs || [];
-        const sbCompleted = jobsList.filter((j: any) => j.phase === "COMPLETED").length;
-        const sbTotal = jobsList.length;
-        const totalCompleted = (lb?.jobsCompleted || 0) + sbCompleted;
-        const totalJobs = (lb?.jobsTotal || 0) + sbTotal;
-        const completionRate = totalJobs > 0 ? Math.round((totalCompleted / totalJobs) * 100) : 0;
-        const totalRevenue = parseFloat(lb?.revenue || "0") + jobsList.reduce((sum: number, j: any) => j.phase === "COMPLETED" ? sum + (j.amount_usd || 0) : sum, 0);
 
         if (agentServices.length > 0) {
           setOnChainAgent({
@@ -139,10 +133,10 @@ export default function AgentDetailPage() {
             description: agentServices[0].description,
             address: agentServices[0].provider,
             services: agentServices,
-            revenue: totalRevenue.toFixed(2),
-            jobsCompleted: totalCompleted,
-            jobsTotal: totalJobs,
-            completionRate,
+            revenue: lb?.revenueFormatted || "0",
+            jobsCompleted: lb?.jobsCompleted || 0,
+            jobsTotal: lb?.jobsTotal || 0,
+            completionRate: lb?.completionRate || 0,
           });
         }
 

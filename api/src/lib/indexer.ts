@@ -243,35 +243,6 @@ async function computeStats() {
     }
   }
 
-  // ── Merge Supabase jobs (butler chat flow) ────────────────────────────────
-  try {
-    const sbUrl = process.env.SUPABASE_URL;
-    const sbKey = process.env.SUPABASE_KEY || process.env.SUPABASE_ANON_KEY;
-    if (sbUrl && sbKey) {
-      const { createClient } = await import("@supabase/supabase-js");
-      const sb = createClient(sbUrl, sbKey);
-      const { data: jobs } = await sb.from("jobs").select("seller_agent_id, phase, amount_usd").order("created_at", { ascending: false }).limit(500);
-      if (jobs) {
-        for (const job of jobs) {
-          const key = job.seller_agent_id;
-          if (!agentMap.has(key)) continue; // Only augment known agents
-          const agent = agentMap.get(key)!;
-          agent.jobsTotal++;
-          if (job.phase === "COMPLETED") {
-            agent.jobsCompleted++;
-            const usd = parseFloat(job.amount_usd || "0");
-            const wei = BigInt(Math.floor(usd * 1e18));
-            agent.revenue += wei;
-            totalRevenue += wei;
-            totalCompleted++;
-          }
-        }
-      }
-    }
-  } catch (e: any) {
-    console.warn("[indexer] Supabase jobs merge failed:", e.message);
-  }
-
   // Compute rates + format
   for (const agent of agentMap.values()) {
     agent.revenueFormatted = formatUnits(agent.revenue, 18);
@@ -299,13 +270,10 @@ async function computeStats() {
     uniqueAgents.add(d.sellerAgentId);
   });
 
-  // Total deals = on-chain + Supabase jobs
-  const totalJobsAll = leaderboard.reduce((sum, a) => sum + a.jobsTotal, 0);
-
   stats = {
     totalRevenue: formatUnits(totalRevenue, 18),
     totalRevenueRaw: totalRevenue,
-    totalDeals: totalJobsAll || deals.length,
+    totalDeals: deals.length,
     totalCompletedDeals: totalCompleted,
     totalActiveServices: services.filter(s => s.active).length,
     totalAgents: uniqueAgents.size,
