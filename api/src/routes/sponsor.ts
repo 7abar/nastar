@@ -258,6 +258,139 @@ router.post("/deploy", async (req: Request, res: Response) => {
 });
 
 /**
+ * POST /v1/sponsor/mint-and-transfer
+ * Mint ERC-8004 identity + transfer to user + drip gas.
+ * User then calls registerService() themselves (so they're the provider).
+ *
+ * Body: { ownerAddress: string }
+ * Returns: { agentNftId, txHashes, gasDripped }
+ */
+router.post("/mint-and-transfer", async (req: Request, res: Response) => {
+  // Rate-limit reuses the deploy limiter
+  const clientIp = req.ip || req.headers["x-forwarded-for"]?.toString() || "unknown";
+  const now = Date.now();
+  const entry = deployRateMap.get(clientIp);
+  if (!entry || now > entry.resetAt) {
+    deployRateMap.set(clientIp, { count: 1, resetAt: now + DEPLOY_WINDOW });
+  } else {
+    entry.count++;
+    if (entry.count > DEPLOY_LIMIT) {
+      return res.status(429).json({ error: "Rate limit reached. Max 3 per hour." });
+    }
+  }
+
+  try {
+    const { ownerAddress } = req.body;
+    if (!ownerAddress) {
+      return res.status(400).json({ error: "ownerAddress is required" });
+    }
+
+    const pk = process.env.PRIVATE_KEY;
+    if (!pk) return res.status(500).json({ error: "Server wallet not configured" });
+
+    const account = privateKeyToAccount(pk as `0x${string}`);
+    const walletClient = createWalletClient({
+      account,
+      chain: celo,
+      transport: http(CELO_RPC),
+    });
+
+    const txHashes: string[] = [];
+
+    // Check if user already has an NFT
+    const balance = await publicClient.readContract({
+      address: CONTRACTS.IDENTITY_REGISTRY as `0x${string}`,
+      abi: IDENTITY_ABI,
+      functionName: "balanceOf",
+      args: [ownerAddress as `0x${string}`],
+    });
+
+    let agentNftId: number | null = null;
+
+    if (balance === 0n) {
+      // Mint — goes to server wallet
+      const mintHash = await walletClient.writeContract({
+        address: CONTRACTS.IDENTITY_REGISTRY as `0x${string}`,
+        abi: IDENTITY_ABI,
+        functionName: "register",
+      });
+      const receipt = await publicClient.waitForTransactionReceipt({ hash: mintHash });
+      txHashes.push(mintHash);
+
+      const transferLog = receipt.logs.find(
+        (l) => l.topics[0] === "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+      );
+      if (transferLog?.topics[3]) {
+        agentNftId = Number(BigInt(transferLog.topics[3]));
+      }
+    } else {
+      // Already has NFT — find it
+      for (let i = 0n; i <= 2000n; i++) {
+        try {
+          const owner = await publicClient.readContract({
+            address: CONTRACTS.IDENTITY_REGISTRY as `0x${string}`,
+            abi: IDENTITY_ABI,
+            functionName: "ownerOf",
+            args: [i],
+          });
+          if ((owner as string).toLowerCase() === ownerAddress.toLowerCase()) {
+            agentNftId = Number(i);
+            break;
+          }
+        } catch { continue; }
+      }
+    }
+
+    if (agentNftId === null) {
+      return res.status(500).json({ error: "Failed to mint or find agent NFT" });
+    }
+
+    // Transfer NFT to user (skip if user already owns it)
+    if (balance === 0n) {
+      const TRANSFER_ABI = parseAbi([
+        "function transferFrom(address from, address to, uint256 tokenId)",
+      ]);
+      const transferHash = await walletClient.writeContract({
+        address: CONTRACTS.IDENTITY_REGISTRY as `0x${string}`,
+        abi: TRANSFER_ABI,
+        functionName: "transferFrom",
+        args: [account.address, ownerAddress as `0x${string}`, BigInt(agentNftId)],
+      });
+      await publicClient.waitForTransactionReceipt({ hash: transferHash });
+      txHashes.push(transferHash);
+    }
+
+    // Drip gas so user can call registerService
+    let gasDripped = false;
+    try {
+      const userBalance = await publicClient.getBalance({ address: ownerAddress as `0x${string}` });
+      if (userBalance < BigInt("5000000000000000")) { // < 0.005 CELO
+        const gasHash = await walletClient.sendTransaction({
+          to: ownerAddress as `0x${string}`,
+          value: BigInt("10000000000000000"), // 0.01 CELO
+        });
+        await publicClient.waitForTransactionReceipt({ hash: gasHash });
+        txHashes.push(gasHash);
+        gasDripped = true;
+      }
+    } catch (e: any) {
+      console.warn("[sponsor] gas drip failed:", e.message);
+    }
+
+    return res.json({
+      success: true,
+      agentNftId,
+      ownerAddress,
+      txHashes,
+      gasDripped,
+    });
+  } catch (err: any) {
+    console.error("[sponsor] mint-and-transfer error:", err.message);
+    return res.status(500).json({ error: err.message?.slice(0, 200) || "Mint failed" });
+  }
+});
+
+/**
  * POST /v1/sponsor/gas
  * Send a small amount of CELO to user's wallet for gas.
  * User then transacts directly (owns their NFT + services).

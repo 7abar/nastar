@@ -4,9 +4,10 @@ export const dynamic = "force-dynamic";
 import { useState } from "react";
 import { usePrivy, useWallets } from "@privy-io/react-auth";
 import { useRouter } from "next/navigation";
-import { createPublicClient, http } from "viem";
+import { createPublicClient, createWalletClient, custom, http } from "viem";
 import {
   celoSepoliaCustom,
+  CONTRACTS,
   TOKEN_LIST,
   CELO_TOKENS,
 } from "@/lib/contracts";
@@ -398,42 +399,102 @@ export default function LaunchPage() {
 
     try {
       const wallet = wallets[0];
+      const provider = await wallet.getEthereumProvider();
       const ownerAddress = wallet.address as `0x${string}`;
 
       // 1. Generate agent wallet
       setStatus("Generating agent wallet...");
       const agentWallet = generateAgentWallet();
 
-      // 2. Deploy on-chain via server-sponsored endpoint (zero gas for user)
-      setStatus("Deploying on-chain (gas sponsored)...");
-      const primaryOffering = config.offerings[0];
-      const tagList = config.tags.split(",").map((t: string) => t.trim()).filter(Boolean);
-      const feeWei = String(BigInt(Math.floor(parseFloat(primaryOffering.fee) * 1e18)));
-
-      const deployRes = await fetch(`${API_URL}/v1/sponsor/deploy`, {
+      // 2. Mint identity + transfer to user + drip gas (all server-sponsored)
+      setStatus("Minting agent identity (sponsored)...");
+      const mintRes = await fetch(`${API_URL}/v1/sponsor/mint-and-transfer`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ownerAddress,
-          name: config.name,
-          description: primaryOffering.description || "",
-          endpoint: `${API_URL}/api/agent/endpoint`,
-          paymentToken: primaryOffering.paymentToken || "0x0000000000000000000000000000000000000000",
-          pricePerCall: feeWei,
-          tags: tagList,
-        }),
+        body: JSON.stringify({ ownerAddress }),
       });
 
-      if (!deployRes.ok) {
-        const errData = await deployRes.json().catch(() => ({}));
-        throw new Error(errData.error || "Sponsored deploy failed");
+      if (!mintRes.ok) {
+        const errData = await mintRes.json().catch(() => ({}));
+        throw new Error(errData.error || "Sponsored mint failed");
       }
 
-      const sponsorData = await deployRes.json();
-      const agentNftId = sponsorData.agentNftId;
-      if (!agentNftId) throw new Error("Failed to get agent NFT ID from deploy");
+      const mintData = await mintRes.json();
+      const agentNftId = mintData.agentNftId;
+      if (!agentNftId) throw new Error("Failed to get agent NFT ID");
 
-      // 4. Store agent config + register hosted runtime
+      // 3. Register service (user's wallet — user becomes the provider)
+      setStatus("Registering service on-chain...");
+      const primaryOffering = config.offerings[0];
+      const feeForChain = BigInt(Math.floor(parseFloat(primaryOffering.fee) * 1e18));
+      const tagList = config.tags.split(",").map((t: string) => t.trim()).filter(Boolean);
+      const tagBytes = tagList.map((t: string) =>
+        `0x${Array.from(new TextEncoder().encode(t.padEnd(32, "\0"))).slice(0, 32).map(b => b.toString(16).padStart(2, "0")).join("")}` as `0x${string}`
+      );
+
+      const walletClient = createWalletClient({
+        account: ownerAddress,
+        chain: celoSepoliaCustom,
+        transport: custom(provider),
+      });
+
+      const svcHash = await walletClient.writeContract({
+        address: CONTRACTS.SERVICE_REGISTRY as `0x${string}`,
+        abi: [{
+          type: "function", name: "registerService",
+          inputs: [
+            { name: "agentId", type: "uint256" },
+            { name: "name", type: "string" },
+            { name: "description", type: "string" },
+            { name: "endpoint", type: "string" },
+            { name: "paymentToken", type: "address" },
+            { name: "pricePerCall", type: "uint256" },
+            { name: "tags", type: "bytes32[]" },
+          ],
+          outputs: [{ type: "uint256" }], stateMutability: "nonpayable",
+        }],
+        functionName: "registerService",
+        args: [
+          BigInt(agentNftId),
+          config.name,
+          primaryOffering.description || "",
+          `${API_URL}/api/agent/endpoint`,
+          (primaryOffering.paymentToken || "0x0000000000000000000000000000000000000000") as `0x${string}`,
+          feeForChain,
+          tagBytes,
+        ],
+      });
+
+      const publicClient = createPublicClient({ chain: celoSepoliaCustom, transport: http() });
+      await publicClient.waitForTransactionReceipt({ hash: svcHash });
+
+      // Get serviceId
+      const nextServiceId = await publicClient.readContract({
+        address: CONTRACTS.SERVICE_REGISTRY as `0x${string}`,
+        abi: [{
+          type: "function", name: "nextServiceId", inputs: [], outputs: [{ type: "uint256" }], stateMutability: "view",
+        }],
+        functionName: "nextServiceId",
+      });
+      const sponsorData = { serviceId: Number(nextServiceId as bigint) - 1 };
+
+      // 4. Set metadata URI (user owns NFT, non-critical)
+      try {
+        await walletClient.writeContract({
+          address: CONTRACTS.IDENTITY_REGISTRY as `0x${string}`,
+          abi: [{
+            type: "function", name: "setAgentURI",
+            inputs: [{ name: "tokenId", type: "uint256" }, { name: "agentURI", type: "string" }],
+            outputs: [], stateMutability: "nonpayable",
+          }],
+          functionName: "setAgentURI",
+          args: [BigInt(agentNftId), `${API_URL}/api/agent/${agentNftId}/metadata`],
+        });
+      } catch {
+        // Non-critical — can be set later
+      }
+
+      // 5. Store agent config + register hosted runtime
       setStatus("Storing agent configuration...");
       const apiKey = generateApiKey();
 
